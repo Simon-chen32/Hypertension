@@ -275,9 +275,11 @@ ggplot(la_hyper_imd) +
   geom_bar()
 
 ggplot(la_hyper_imd) + 
-  aes(x = RGN18NM, y = hypertension_prevalence, color = RGN18NM) + 
+  aes(x = reorder(RGN18NM, -hypertension_prevalence), y = hypertension_prevalence, color = RGN18NM) + 
   geom_boxplot() +
-  coord_flip()
+  coord_flip() +
+  geom_hline(aes(yintercept=mean(hypertension_prevalence)), color = 'black', 
+             size = 1)
 
 # Investigate by LA 
 london_hyper_imd <- merge(london_hyper, LSOA_imd_cl, by.x = 'LSOA11CD', by.y = 'lsoa_code_2011')
@@ -295,14 +297,14 @@ ggplot(london_hyper_imd) +
   geom_bar()
 
 ggplot(london_hyper_imd) + 
-  aes(x = LAD11NM, y = hypertension_prevalence, color = LAD11NM) + 
+  aes(x = reorder(LAD11NM, -hypertension_prevalence), y = hypertension_prevalence, color = LAD11NM) + 
   geom_boxplot() + coord_flip() +
   geom_hline(aes(yintercept=mean(hypertension_prevalence)), color = 'black', 
              size = 0.6) 
 
 
-# Investigate relationship between Health Deprivation and Hypertension Prevalence
-ggplot(lsoa_hyper_imd, aes(x = living_environment_score, y = hypertension_prevalence)) + 
+# Investigate relationship between IMD and Hypertension Prevalence
+ggplot(lsoa_hyper_imd, aes(x = imd_score, y = hypertension_prevalence)) + 
   geom_point(aes(color = imd_decile)) +
   stat_smooth(method = 'lm', col = 'red', size = 1)
 
@@ -523,7 +525,7 @@ QOF_19_to_20 <- QOF_19_data %>%
                                  TRUE ~ QOF_19_data$ccg_code)) %>%
   subset(., select = -c(ccg_code))
 
-QOF_20 <- merge(QOF_19_to_20, Hyper19_20_cl, by.x = "new_code", by.y = 'ccg_code', all = TRUE) 
+QOF_20 <- merge(QOF_19_to_20, Hyper19_20_grouped, by.x = "new_code", by.y = 'ccg_code', all = TRUE) 
 
 QOF_cl <- QOF_20[-219,] # Clean and Finalised Dataset of 5 years of QOF Data
 
@@ -576,6 +578,4 @@ QOF_data <- QOF_cl %>%
             tot_o80_denominator_19_20 = sum(tot_o80_denominator_19_20, na.rm = TRUE), 
             avg_o80_achievement_19_20 = mean(avg_o80_achievement_19_20, na.rm = TRUE), 
             avg_o80_intervention_19_20 = mean(avg_o80_intervention_19_20, na.rm = TRUE))
-
-
 
