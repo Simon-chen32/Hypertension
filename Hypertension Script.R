@@ -24,6 +24,15 @@ London_2011 <- st_read("~/Hypertension/LSOA Shapefiles/statistical-gis-boundarie
 London_LAD <- st_read("~/Hypertension/LSOA Shapefiles/statistical-gis-boundaries-london/ESRI/London_Borough_Excluding_MHW.shp") %>%
   subset(., select = -c(ONS_INNER, SUB_2006, SUB_2009))
 
+# Loading in Age Prevalence Data
+age_prev <- read_csv("hypertension_age_prevalence.csv") 
+### Note: The above CSV has been manually altered for data management purposes
+
+age_prev_cl <- age_prev %>% 
+  rename(y2019 = `2019`) %>%
+  subset(., select = c(Group, Sex, y2019)) %>%
+  pivot_wider(names_from = c(Group, Sex), values_from = y2019)
+
 # Loading in GP Data
 GP_age_dist <- read_csv("~/Hypertension/GP Data/PopulationAgeDistribution.csv") %>%
   clean_names()
@@ -63,6 +72,72 @@ GP_lsoa_data <- GP_lsoa_dist %>%
             practice_code = practice_code, 
             number_of_patients = number_of_patients)
 
+lsoa_male_age_dist <- read_csv("lsoa_male_age_estimates.csv", skip = 4) %>%
+  clean_names() 
+
+lsoa_female_age_dist <- read_csv("lsoa_female_age_estimates.csv", skip = 4) %>%
+  clean_names()
+
+# Separating lsoa age distribution into the subcategories 
+lsoa_male_age_dist_cl <- lsoa_male_age_dist %>%
+  mutate(age0_15 = rowSums(select(., x0:x15)),
+         age16_24 = rowSums(select(., x16:x24)), 
+         age25_34 = rowSums(select(., x25:x34)), 
+         age35_44 = rowSums(select(., x35:x44)), 
+         age45_54 = rowSums(select(., x45:x54)), 
+         age55_64 = rowSums(select(., x55:x64)), 
+         age65_79 = rowSums(select(., x65:x79)), 
+         age80plus = rowSums(select(., x80:x90))) %>%
+  subset(., select = c(lsoa_code, lsoa_name, all_ages, age0_15, age16_24, age25_34, 
+                       age35_44, age45_54, age55_64, age65_79, age80plus))
+
+lsoa_female_age_dist_cl <- lsoa_female_age_dist %>%
+  mutate(age0_15 = rowSums(select(., x0:x15)),
+         age16_24 = rowSums(select(., x16:x24)), 
+         age25_34 = rowSums(select(., x25:x34)), 
+         age35_44 = rowSums(select(., x35:x44)), 
+         age45_54 = rowSums(select(., x45:x54)), 
+         age55_64 = rowSums(select(., x55:x64)), 
+         age65_79 = rowSums(select(., x65:x79)), 
+         age80plus = rowSums(select(., x80:x90))) %>%
+  subset(., select = c(lsoa_code, lsoa_name, all_ages, age0_15, age16_24, age25_34, 
+                       age35_44, age45_54, age55_64, age65_79, age80plus))
+
+
+# calculating the expected hypertension prevalence by age group
+lsoa_male_age_dist_cl <- lsoa_male_age_dist_cl %>%
+  mutate(exp_hyp_16_24 = age16_24*0.01, 
+         exp_hyp_25_34 = age25_34*0.01, 
+         exp_hyp_35_44 = age35_44*0.03, 
+         exp_hyp_45_54 = age45_54*0.10, 
+         exp_hyp_55_64 = age55_64*0.26, 
+         exp_hyp_65_79 = age65_79*0.38)
+
+lsoa_female_age_dist_cl <- lsoa_female_age_dist_cl %>%
+  mutate(exp_hyp_16_24 = age16_24*0.00, 
+         exp_hyp_25_34 = age25_34*0.01, 
+         exp_hyp_35_44 = age35_44*0.02, 
+         exp_hyp_45_54 = age45_54*0.09, 
+         exp_hyp_55_64 = age55_64*0.19, 
+         exp_hyp_65_79 = age65_79*0.32)
+
+
+# calculating the total expected hypertension
+lsoa_male_age_dist_cl <- lsoa_male_age_dist_cl %>%
+  mutate(exp_hyp_male = exp_hyp_16_24 + exp_hyp_25_34 + exp_hyp_35_44 + exp_hyp_45_54 + exp_hyp_55_64 + exp_hyp_65_79)
+
+lsoa_female_age_dist_cl <- lsoa_female_age_dist_cl %>%
+  mutate(exp_hyp_female = exp_hyp_16_24 + exp_hyp_25_34 + exp_hyp_35_44 + exp_hyp_45_54 + exp_hyp_55_64 + exp_hyp_65_79)
+
+lsoa_age_dist_exp <- merge(lsoa_male_age_dist_cl, lsoa_female_age_dist_cl, by = c("lsoa_code", "lsoa_name")) %>%
+  mutate(tot_pop = all_ages.x + all_ages.y)
+  
+
+subset(., select = c(lsoa_code, lsoa_name, exp_hyp_male, exp_hyp_female, tot_pop)) %>%
+  mutate(exp_hyp = exp_hyp_female + exp_hyp_male, 
+         exp_hyp_prev = exp_hyp/tot_pop)
+
+# Loading in some files for aggregating geography upwards
 lsoa_ccg_la <- read_csv("LSOA_to_CCG_to_LA_ApriL_2017.csv")
 
 lad_region <- read_csv("Local_Authority_District_to_Region_(December_2018)_Lookup_in_England.csv")
@@ -95,18 +170,16 @@ Hyper21_22_cl <- Hyper21_22 %>%
                        prevalence_percent_21_22, under79_numerator_21_22, under79_denominator_21_22, 
                        under79_achievement_net_exceptions_21_22, under79_percent_receiving_intervention_21_22,
                        over80_numerator_21_22, over80_denominator_21_22, over80_achievement_net_exceptions_21_22,
-                       over80_percent_receiving_intervention_21_22))
+                       over80_percent_receiving_intervention_21_22)) %>%
+  mutate(over80_prev = over80_denominator_21_22/over80_21_22, 
+         under79_prev = under79_denominator_21_22/under79_21_22)
 
 lsoa_hyper_prev <- merge(GP_lsoa_data, Hyper21_22_cl, by = 'practice_code') %>%
   # Create new column for the percentage of patients a GP serves in each LSOA 
-  mutate(gp_coverage = (number_of_patients/lsoa_pop))
+  mutate(gp_coverage = (number_of_patients/lsoa_pop), 
+         gp_share = (number_of_patients/list_size_21_22)*register_21_22)
 
 # Check if any Practices/LSOAs did not merge over 
-checkGP = setdiff( GP_lsoa_data$practice_code, Hyper21_22_cl$practice_code)
-checkGP2 = setdiff(Hyper21_22_cl$practice_code, GP_lsoa_data$practice_code)
-
-alldiff_GP <- Hyper21_22_cl[1:dim(Hyper21_22_cl)[1] %in% checkGP,]
-
 checkLSOA = setdiff(GP_lsoa_data$lsoa_code, lsoa_hyper_prev$lsoa_code)
 
 #### Comparing 2019-20 Data to 2021-22 Data #####
@@ -169,10 +242,28 @@ GP_unchanged <- Hyper_compare %>%
 mean(lsoa_hyper_prev$prevalence_percent_21_22) # 12.61%
 median(lsoa_hyper_prev$prevalence_percent_21_22) # 13.03%
 
+# aggregating prevalence from practice to lsoa level
 lsoa_grouped <- lsoa_hyper_prev %>%
   group_by(lsoa_code) %>%
-  summarise(hypertension_prevalence = sum(gp_coverage*prevalence_percent_21_22))
- 
+  summarise(hypertension_prevalence = sum(gp_coverage*prevalence_percent_21_22), 
+            observed_hypertension = sum(gp_share), 
+            over80_prev = sum(over80_prev*gp_coverage),
+            u79_prev = sum(gp_coverage*under79_prev))
+
+# merging with expected hypertension rates for males and females 
+lsoa_age_adj <- merge(lsoa_grouped, lsoa_age_dist_exp, by = 'lsoa_code') %>%
+  mutate(exp_hyp_80plus = (age80plus.x*over80_prev + age80plus.y*over80_prev), 
+         exp_hyp = exp_hyp_80plus + exp_hyp_male + exp_hyp_female, 
+         exp_hyp_prev = exp_hyp/tot_pop) %>%
+  subset(., select = c(lsoa_code, lsoa_name, hypertension_prevalence, observed_hypertension, exp_hyp_male, 
+                       exp_hyp_female, exp_hyp_80plus, exp_hyp, tot_pop, exp_hyp_prev))
+
+lsoa_age_adj <- lsoa_age_adj %>%
+  mutate(obs_over_exp = observed_hypertension/exp_hyp, 
+         obs_exp_diff = observed_hypertension - exp_hyp,
+         age_std_prev = hypertension_prevalence*obs_over_exp)
+
+# Merging at CCG 
 ccg_grouped <- merge(lsoa_grouped, lsoa_hyper_prev, by = 'lsoa_code') %>%
   subset(., select = c(lsoa_code, hypertension_prevalence, 
                        sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name))
@@ -198,9 +289,10 @@ tm_shape(hyper_prev_shp) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence by LSOA', legend.outside = TRUE) 
 
-lad_prevalence <- merge(lsoa_ccg_la, lsoa_grouped, by.x = 'LSOA11CD', by.y = 'lsoa_code') %>%
+lad_prevalence <- merge(lsoa_ccg_la, lsoa_age_adj, by.x = 'LSOA11CD', by.y = 'lsoa_code') %>%
   group_by(LAD17CD) %>%
-  summarise(hypertension_prevalence = mean(hypertension_prevalence))
+  summarise(hypertension_prevalence = mean(hypertension_prevalence), 
+            obs_exp_diff = mean(obs_exp_diff))
 
 lad_hypertension <- merge(ENG_LAD17, lad_prevalence, by.x = 'lad17cd', by.y = 'LAD17CD')
 
@@ -221,6 +313,13 @@ tm_shape(lad_hypertension) +
               legend.hist = TRUE, palette = "Blues") +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence by Local Authority', legend.outside = TRUE) 
+
+tm_shape(lad_hypertension) +
+  tm_polygons(col = 'obs_exp_diff', border.alpha = 0.5, title = "Difference", 
+              legend.hist = TRUE, palette = "RdBu") +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
+  tm_layout(main.title = 'Difference in Expected and Observed Hypertension by Local Authority', legend.outside = TRUE) 
+
 
 tm_shape(ldn_boro_hyper) +
   tm_polygons(col = 'hypertension_prevalence', border.alpha = 0.5, title = "Hypertension Prevalence %", 
@@ -445,13 +544,6 @@ Hyper18_19_cl <- Hyper18_19 %>%
             tot_denominator_18_19 = sum(hyp006_denominator_18_19),
             avg_achievement_18_19 = mean(achievement_net_exceptions_18_19), 
             avg_intervention_18_19 = mean(percent_receiving_intervention_18_19))
-
-Compare_18_19 <- full_join(Hyper18_19, Hyper19_20_cl)
-Compare_18_19$prev_diff <- Compare_18_19$prevalence_percent_19_20 - Compare_18_19$prevalence_percent_18_19
-
-GP_unchanged_18_19 <- Compare_18_19 %>%
-  filter(., prev_diff <= 0.1) %>%
-  filter(., prev_diff >= -0.1)
 
 # Load in Data to Change the CCG Codes
 ccg_2019_codes <- read_csv("merges_up_to_2019.csv") %>%
