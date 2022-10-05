@@ -133,12 +133,10 @@ GP_lsoa_data <- GP_lsoa_dist %>%
 GP_lsoa_age_data <- merge(GP_lsoa_data, GP_age_dist_cl, by.x = 'practice_code', by.y = 'area_code') 
 
 # Loading in some files for aggregating geography upwards
-lsoa_ccg_la <- read_csv("LSOA_to_CCG_to_LA_ApriL_2017.csv")
+lsoa_ccg_la <- read_csv("LSOA_to_CCG_to_LAD_(April_2021)_Lookup_in_England.csv")
 
 ccg_region <- read_csv("CCG_to_STP_and_NHS_England_(Region)_(April_2021)_Lookup_in_England.csv") %>%
   subset(., select = c(CCG21CD, CCG21CDH, CCG21NM, NHSER21CD, NHSER21NM))
-
-lad_region <- read_csv("Local_Authority_District_to_Region_(December_2018)_Lookup_in_England.csv")
 
 # Checking what LSOA's don't merge, as there is a difference between the two lists
 
@@ -180,9 +178,6 @@ lsoa_hyper_prev <- merge(GP_lsoa_age_data, Hyper21_22_cl, by = 'practice_code') 
   mutate(gp_coverage = (number_of_patients/lsoa_pop), 
          gp_share = (number_of_patients/list_size_21_22)*register_21_22, 
          exp_hyp = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100)
-
-# Check if any Practices/LSOAs did not merge over 
-checkLSOA = setdiff(GP_lsoa_data$lsoa_code, lsoa_hyper_prev$lsoa_code)
 
 #### Comparing 2019-20 Data to 2021-22 Data #####
 ## 19-20 ##
@@ -252,17 +247,7 @@ lsoa_age_adj <- lsoa_grouped %>%
          age_std_prev = obs_hyper_prev*obs_over_exp)
 
 # Merging at CCG 
-ccg_grouped <- merge(lsoa_age_adj, lsoa_hyper_prev, by = 'lsoa_code') %>%
-  subset(., select = c(lsoa_code, exp_hyp_male, exp_hyp_female, obs_hyper_prev, exp_hyper_prev, obs_over_exp, age_std_prev,
-                       sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name))
-
-# Changing some CCG Codes to Match 2021 Codes 
-ccg_grouped$sub_icb_loc_ons_code[ccg_grouped$sub_icb_loc_ons_code == "E38000258"] <- "E38000220"
-ccg_grouped$sub_icb_loc_ons_code[ccg_grouped$sub_icb_loc_ons_code == "E38000259"] <- "E38000250"
-ccg_grouped$sub_icb_loc_ons_code[ccg_grouped$sub_icb_loc_ons_code == "E38000260"] <- "E38000026"
-ccg_grouped$sub_icb_loc_ons_code[ccg_grouped$sub_icb_loc_ons_code == "E38000261"] <- "E38000229"
-ccg_grouped$sub_icb_loc_ons_code[ccg_grouped$sub_icb_loc_ons_code == "E38000262"] <- "E38000242"
-ccg_grouped$sub_icb_loc_ons_code[ccg_grouped$sub_icb_loc_ons_code == "E38000263"] <- "E38000182" # NHS Tameside and Glossop to NHS Greater Manchester
+ccg_grouped <- merge(lsoa_age_adj, lsoa_ccg_la, by.x = 'lsoa_code', by.y = 'LSOA11CD') 
 
 # comparing mean and median in new df to data reported by GPs 
 mean(lsoa_grouped$hypertension_prevalence) # 14.31%
@@ -276,15 +261,6 @@ tm_shape(hyper_prev_shp) +
               legend.hist = TRUE, palette = "-RdBu") +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Hypertension Rates vs Expected', legend.outside = TRUE) 
-
-lad_prevalence <- merge(lsoa_ccg_la, lsoa_age_adj, by.x = 'LSOA11CD', by.y = 'lsoa_code') %>%
-  group_by(LAD17CD) %>%
-  summarise(hypertension_prevalence = mean(hypertension_prevalence), 
-            obs_exp_diff = mean(obs_exp_diff))
-
-lad_hypertension <- merge(ENG_LAD17, lad_prevalence, by.x = 'lad17cd', by.y = 'LAD17CD')
-
-ldn_boro_hyper <- merge(London_LAD, lad_prevalence, by.x = 'GSS_CODE', by.y = 'LAD17CD')
 
 # create a plot for London
 london_hyper <- merge(London_2011, lsoa_age_adj, by.x = 'LSOA11CD', by.y = 'lsoa_code')
@@ -302,13 +278,6 @@ tm_shape(lad_hypertension) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence by Local Authority', legend.outside = TRUE) 
 
-tm_shape(lad_hypertension) +
-  tm_polygons(col = 'obs_exp_diff', border.alpha = 0.5, title = "Difference", 
-              legend.hist = TRUE, palette = "RdBu") +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
-  tm_layout(main.title = 'Difference in Expected and Observed Hypertension by Local Authority', legend.outside = TRUE) 
-
-
 tm_shape(ldn_boro_hyper) +
   tm_polygons(col = 'hypertension_prevalence', border.alpha = 0.5, title = "Hypertension Prevalence %", 
               legend.hist = TRUE, palette = "Blues") +
@@ -316,7 +285,8 @@ tm_shape(ldn_boro_hyper) +
   tm_layout(main.title = 'Hypertension Prevalence by Borough', legend.outside = TRUE) 
 
 # Plot at CCG Level 
-ccg_hyper <- merge(ccg_region, ccg_grouped, by.x = 'CCG21CD', by.y = 'sub_icb_loc_ons_code')
+ccg_hyper <- merge(ccg_region, ccg_grouped, by = c('CCG21CD', 'CCG21NM', 'CCG21CDH'))
+  
 ccg_shp <- merge(Eng_CCG, ccg_hyper, by = c('CCG21CD', 'CCG21NM'))
 
 midlands_hyper <- subset(ccg_shp, NHSER21NM == 'Midlands')
@@ -335,6 +305,69 @@ ggplot(ccg_hyper) +
              size = 1) +
   theme(legend.position = "none")
 
+# Breaking it Down by Region 
+# Midlands
+ggplot(midlands_hyper) + 
+  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
+  geom_boxplot() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")
+
+tm_shape(midlands_hyper) +
+  tm_polygons(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
+              legend.hist = TRUE, palette = "Blues") +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'Hypertension Prevalence by CCG', legend.outside = TRUE) 
+
+# North East and Yorkshire
+ggplot(north_east_hyper) + 
+  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
+  geom_boxplot() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")
+
+# NW England
+ggplot(north_west_hyper) + 
+  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
+  geom_boxplot() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")
+
+# London 
+ggplot(london_ccg_hyper) + 
+  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
+  geom_boxplot() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")
+
+# SE England
+ggplot(south_east_hyper) + 
+  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
+  geom_boxplot() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")
+
+# SW England
+ggplot(south_west_hyper) + 
+  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
+  geom_boxplot() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")
+
+# East England
+ggplot(east_eng_hyper) + 
+  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
+  geom_boxplot() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")
+
 tm_shape(ccg_hyper) +
   tm_polygons(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
               legend.hist = TRUE, palette = "Blues") +
@@ -342,13 +375,14 @@ tm_shape(ccg_hyper) +
   tm_layout(main.title = 'Hypertension Prevalence by CCG', legend.outside = TRUE) 
 
 #### Deprivation Analysis ####
-lsoa_hyper_imd <- merge(lsoa_grouped, LSOA_imd_cl, by.x = 'lsoa_code', by.y = 'lsoa_code_2011')
+lsoa_hyper_imd <- merge(lsoa_age_adj, LSOA_imd_cl, by.x = 'lsoa_code', by.y = 'lsoa_code_2011')
 
 la_hyper_imd <- merge(lsoa_hyper_imd, lad_region, by.x = 'local_authority_district_code_2019', by.y = 'LAD18CD')
 
 # Investigating the relationship between IMD and Hypertension Prevalence 
-ggplot(lsoa_hyper_imd, aes(x = imd_decile, y = hypertension_prevalence)) + 
-  geom_point(aes(color = imd_decile))
+ggplot(lsoa_hyper_imd, aes(x = imd_score, y = age_std_prev)) + 
+  geom_point(aes(color = imd_decile)) +
+  stat_smooth(method = 'lm', col = 'red', size = 1)
 
 # Seems there's little relationship
 
