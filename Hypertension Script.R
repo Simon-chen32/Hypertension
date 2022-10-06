@@ -285,17 +285,40 @@ tm_shape(ldn_boro_hyper) +
   tm_layout(main.title = 'Hypertension Prevalence by Borough', legend.outside = TRUE) 
 
 # Plot at CCG Level 
-ccg_hyper <- merge(ccg_region, ccg_grouped, by = c('CCG21CD', 'CCG21NM', 'CCG21CDH'))
-  
-ccg_shp <- merge(Eng_CCG, ccg_hyper, by = c('CCG21CD', 'CCG21NM'))
+ccg_shp <- merge(Eng_CCG, ccg_region, by = c('CCG21CD', 'CCG21NM'))
+lsoa_ccg_shp <- merge(ENG_LSOA11, ccg_grouped, by.x = 'geo_code', by.y = 'lsoa_code')
+shp_df <- merge(lsoa_ccg_shp, ccg_region, by = c('CCG21CD', 'CCG21NM', 'CCG21CDH'))
 
-midlands_hyper <- subset(ccg_shp, NHSER21NM == 'Midlands')
-north_east_hyper <- subset(ccg_shp, NHSER21NM == 'North East and Yorkshire')
-north_west_hyper <- subset(ccg_shp, NHSER21NM == 'North West')
-london_ccg_hyper <- subset(ccg_shp, NHSER21NM == 'London')
-south_east_hyper <- subset(ccg_shp, NHSER21NM == 'South East')
-south_west_hyper <- subset(ccg_shp, NHSER21NM == 'South West')
-east_eng_hyper <- subset(ccg_shp, NHSER21NM == 'East of England')
+# separate file that aggregates the data
+ccg_agg <- ccg_grouped %>%
+  group_by(CCG21CD, CCG21NM) %>%
+  summarise(obs_hyper_prev = mean(obs_hyper_prev), 
+            exp_hyper_prev = mean(exp_hyper_prev), 
+            obs_over_exp = mean(obs_over_exp), 
+            pop = sum(lsoa_pop), 
+            age_std_prev = mean(age_std_prev))
+
+ccg_agg_shp <- merge(Eng_CCG, ccg_agg, by = c('CCG21CD', 'CCG21NM'))
+ccg_agg_region <- merge(ccg_agg_shp, ccg_region)
+  
+# Subsetting CCGs by Region
+midlands_ccg <- subset(ccg_shp, NHSER21NM == 'Midlands')
+north_east_ccg <- subset(ccg_shp, NHSER21NM == 'North East and Yorkshire')
+north_west_ccg <- subset(ccg_shp, NHSER21NM == 'North West')
+london_ccg <- subset(ccg_shp, NHSER21NM == 'London')
+south_east_ccg <- subset(ccg_shp, NHSER21NM == 'South East')
+south_west_ccg <- subset(ccg_shp, NHSER21NM == 'South West')
+east_eng_ccg <- subset(ccg_shp, NHSER21NM == 'East of England')
+
+ccg_hyper <- merge(ccg_shp, ccg_grouped, by = c('CCG21CD', 'CCG21NM', 'CCG21CDH'))
+
+midlands_ccg_hyper <- subset(shp_df, NHSER21NM == 'Midlands')
+north_east_ccg_hyper <- subset(shp_df, NHSER21NM == 'North East and Yorkshire')
+north_west_ccg_hyper <- subset(shp_df, NHSER21NM == 'North West')
+london_ccg_hyper <- merge(London_2011, ccg_grouped, by.x = 'LSOA11CD', by.y = 'lsoa_code')
+south_east_ccg_hyper <- subset(shp_df, NHSER21NM == 'South East')
+south_west_ccg_hyper <- subset(shp_df, NHSER21NM == 'South West')
+east_eng_ccg_hyper <- subset(shp_df, NHSER21NM == 'East of England')
 
 # Looking at Age standardised Prevalence
 ggplot(ccg_hyper) + 
@@ -305,20 +328,39 @@ ggplot(ccg_hyper) +
              size = 1) +
   theme(legend.position = "none")
 
+tm_shape(ccg_agg_shp) + 
+  tm_polygons(col = 'age_std_prev', border.alpha = 0.8, title = "Age Std. Prevalence %", legend.hist = TRUE, 
+              palette = "-RdBu") + 
+  tm_compass(position = c("right", "top")) +
+  tm_scale_bar(position = c("left", "bottom")) + 
+  tm_layout(main.title = "Hypertension Prevalence by CCG", legend.outside = TRUE)
+
+tm_shape(hyper_prev_shp) + 
+  tm_fill(col = 'age_std_prev', border.alpha = 0.8, title = "Age Std. Prevalence %", legend.hist = TRUE, 
+              palette = "-RdBu") + 
+  tm_compass(position = c("right", "top")) +
+  tm_scale_bar(position = c("left", "bottom")) + 
+  tm_layout(main.title = "Hypertension Prevalence by LSOA", legend.outside = TRUE) +
+tm_shape(Eng_CCG) + 
+  tm_borders()
+
 # Breaking it Down by Region 
 # Midlands
-ggplot(midlands_hyper) + 
+ggplot(midlands_ccg_hyper) + 
   aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
   geom_boxplot() + coord_flip() +
   geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
              size = 1) +
   theme(legend.position = "none")
 
-tm_shape(midlands_hyper) +
-  tm_polygons(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
+tm_shape(midlands_ccg_hyper) +
+  tm_fill(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
               legend.hist = TRUE, palette = "Blues") +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
-  tm_layout(main.title = 'Hypertension Prevalence by CCG', legend.outside = TRUE) 
+  tm_layout(main.title = 'Hypertension Prevalence by CCG', legend.outside = TRUE) +
+tm_shape(midlands_ccg) +
+  tm_borders()
+
 
 # North East and Yorkshire
 ggplot(north_east_hyper) + 
@@ -328,6 +370,14 @@ ggplot(north_east_hyper) +
              size = 1) +
   theme(legend.position = "none")
 
+tm_shape(north_east_ccg_hyper) +
+  tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
+          legend.hist = TRUE, palette = "-RdBu") +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'Hypertension Prevalence in NE England', legend.outside = TRUE) +
+tm_shape(north_east_ccg) +
+  tm_borders('black', lwd = 1)
+
 # NW England
 ggplot(north_west_hyper) + 
   aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
@@ -335,6 +385,22 @@ ggplot(north_west_hyper) +
   geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
              size = 1) +
   theme(legend.position = "none")
+
+nw_age_std_hyp <- tm_shape(north_west_ccg_hyper) +
+  tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
+          legend.hist = TRUE, palette = "-RdBu") +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'Hypertension Prevalence in NW England', legend.outside = TRUE) +
+tm_shape(north_west_ccg) +
+  tm_borders('black', lwd = 1)
+
+tm_shape(north_west_ccg_hyper) +
+  tm_fill(col = 'obs_over_exp', title = "Obs:Exp Ratio", 
+          legend.hist = TRUE, palette = "-RdBu") +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in NW England', legend.outside = TRUE) +
+  tm_shape(north_west_ccg) +
+  tm_borders('black', lwd = 1)
 
 # London 
 ggplot(london_ccg_hyper) + 
@@ -344,6 +410,24 @@ ggplot(london_ccg_hyper) +
              size = 1) +
   theme(legend.position = "none")
 
+tm_shape(london_hyper) +
+  tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
+              legend.hist = TRUE, palette = "Blues") +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'Hypertension Prevalence by CCG', legend.outside = TRUE) +
+tm_shape(london_ccg) +
+  tm_borders('black', lwd = 1)
+
+london_ccg_hyper_agg <- subset(ccg_agg_region, NHSER21NM == 'London')
+tm_shape(london_ccg_hyper_agg) +
+  tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
+          legend.hist = TRUE, palette = "Blues") +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'Hypertension Prevalence by CCG', legend.outside = TRUE) +
+tm_shape(london_ccg) +
+  tm_borders('black', lwd = 1)
+
+
 # SE England
 ggplot(south_east_hyper) + 
   aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
@@ -351,6 +435,14 @@ ggplot(south_east_hyper) +
   geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
              size = 1) +
   theme(legend.position = "none")
+
+tm_shape(south_east_ccg_hyper) +
+  tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
+          legend.hist = TRUE, palette = "-RdBu") +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'Hypertension Prevalence in SE England', legend.outside = TRUE) +
+tm_shape(south_east_ccg) +
+  tm_borders('black', lwd = 1)
 
 # SW England
 ggplot(south_west_hyper) + 
@@ -360,6 +452,14 @@ ggplot(south_west_hyper) +
              size = 1) +
   theme(legend.position = "none")
 
+tm_shape(south_west_ccg_hyper) +
+  tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
+          legend.hist = TRUE, palette = "-RdBu") +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'Hypertension Prevalence in SW England', legend.outside = TRUE) +
+tm_shape(south_west_ccg) +
+  tm_borders('black', lwd = 1)
+
 # East England
 ggplot(east_eng_hyper) + 
   aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
@@ -368,11 +468,13 @@ ggplot(east_eng_hyper) +
              size = 1) +
   theme(legend.position = "none")
 
-tm_shape(ccg_hyper) +
-  tm_polygons(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
-              legend.hist = TRUE, palette = "Blues") +
+tm_shape(east_eng_ccg_hyper) +
+  tm_fill(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
+              legend.hist = TRUE, palette = "-RdBu") +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
-  tm_layout(main.title = 'Hypertension Prevalence by CCG', legend.outside = TRUE) 
+  tm_layout(main.title = 'Hypertension Prevalence in East England', legend.outside = TRUE) +
+tm_shape(east_eng_ccg) +
+  tm_borders('black', lwd = 1)
 
 #### Deprivation Analysis ####
 lsoa_hyper_imd <- merge(lsoa_age_adj, LSOA_imd_cl, by.x = 'lsoa_code', by.y = 'lsoa_code_2011')
@@ -387,67 +489,66 @@ ggplot(lsoa_hyper_imd, aes(x = imd_score, y = age_std_prev)) +
 # Seems there's little relationship
 
 # Investigate by Region 
-ggplot(la_hyper_imd, aes(x = income_score_rate, y = hypertension_prevalence)) + 
-  geom_point(aes(color = RGN18NM)) +
-  stat_smooth(method = 'lm', col = 'red', size = 1)
-
-ggplot(la_hyper_imd) + 
-  aes(x = hypertension_prevalence, color = RGN18NM, fill = RGN18NM) + 
+ggplot(ccg_hyper) + 
+  aes(x = age_std_prev, color = NHSER21NM, fill = NHSER21NM) + 
   geom_density(alpha = 0.25)
 
-lad_grouped <- la_hyper_imd %>%
-  group_by(local_authority_district_code_2019) %>%
-  summarise(hypertension_prevalence = sum(hypertension_prevalence),
-            mean_imd_decile = mean(imd_decile), 
-            region = RGN18NM)
-
-ggplot(la_hyper_imd) + 
-  aes(x = RGN18NM, fill = hypertension_prevalence) +
-  geom_bar()
-
-ggplot(la_hyper_imd) + 
-  aes(x = reorder(RGN18NM, -hypertension_prevalence), y = hypertension_prevalence, color = RGN18NM) + 
+ggplot(ccg_hyper) + 
+  aes(x = reorder(NHSER21NM, -age_std_prev), y = age_std_prev, color = NHSER21NM) + 
   geom_boxplot() +
   coord_flip() +
-  geom_hline(aes(yintercept=mean(hypertension_prevalence)), color = 'black', 
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
              size = 1)
-
-# Investigate by LA 
-london_hyper_imd <- merge(london_hyper, LSOA_imd_cl, by.x = 'LSOA11CD', by.y = 'lsoa_code_2011')
-
-# London
-ggplot(london_hyper_imd, aes(x = imd_score, y = hypertension_prevalence)) + 
-  geom_point(aes(color = imd_decile))
-
-ggplot(london_hyper_imd) + 
-  aes(x = hypertension_prevalence, color = LAD11NM, fill = LAD11NM) + 
-  geom_density(alpha = 0.25)
-
-ggplot(london_hyper_imd) + 
-  aes(x = LAD11NM, fill = hypertension_prevalence) +
-  geom_bar()
-
-ggplot(london_hyper_imd) + 
-  aes(x = reorder(LAD11NM, -hypertension_prevalence), y = hypertension_prevalence, color = LAD11NM) + 
-  geom_boxplot() + coord_flip() +
-  geom_hline(aes(yintercept=mean(hypertension_prevalence)), color = 'black', 
-             size = 0.6) 
 
 
 # Investigate relationship between IMD and Hypertension Prevalence
-ggplot(lsoa_hyper_imd, aes(x = imd_score, y = hypertension_prevalence)) + 
+ggplot(lsoa_hyper_imd, aes(x = imd_score, y = obs_hyper_prev)) + 
   geom_point(aes(color = imd_decile)) +
   stat_smooth(method = 'lm', col = 'red', size = 1)
 
+# Comparing to Expected Hypertension 
+ggplot(lsoa_hyper_imd, aes(x = imd_score, y = exp_hyper_prev)) + 
+  geom_point(aes(color = imd_decile)) +
+  stat_smooth(method = 'lm', col = 'red', size = 1)
+
+# Seeing how the relationship changes when age adjusted
+ggplot(lsoa_hyper_imd, aes(x = imd_score, y = age_std_prev)) + 
+  geom_point(aes(color = imd_decile)) +
+  stat_smooth(method = 'lm', col = 'red', size = 1)
+
+
+ggplot(london_ccg_hyper) + 
+  aes(x = age_std_prev, color = CCG21NM, fill = CCG21NM) + 
+  geom_density(alpha = 0.25)
+
 # Create a second set Shapefile for Deprivation Prevalence 
+lsoa_ccg_region <- merge(lsoa_ccg_shp, ccg_region, by = c('CCG21CD', 'CCG21NM', 'CCG21CDH'))
+
+ne_imd <- subset(lsoa_ccg_region, NHSER21NM == 'North East and Yorkshire')
+nw_imd <- subset(lsoa_ccg_region, NHSER21NM == 'North West')
+
+
 imd_shp <- merge(ENG_LSOA11, LSOA_imd, by.x = 'geo_code', by.y = 'lsoa_code_2011') 
 
+ne_imd_shp <- merge(ne_imd, LSOA_imd, by.x = 'geo_code', by.y = 'lsoa_code_2011')
+nw_imd_shp <- merge(nw_imd, LSOA_imd, by.x = 'geo_code', by.y = 'lsoa_code_2011')
+
 # analysing the relation between hypertension prevalence and IMD 
-
-
-tm_shape(imd_shp) + 
+tm_shape(ne_imd_shp) + 
   tm_polygons(col = 'imd_decile', legend.title = "Index of Multiple Deprivation Decile by LSOA") 
 
+tm_shape(nw_imd_shp) + 
+  tm_polygons(col = 'imd_decile', border.alpha = 0.5, palette = '-RdBu') 
+
+northwest_imd <- tm_shape(nw_imd_shp) +
+  tm_fill(col = 'imd_decile', title = "IMD Decile",  
+          legend.hist = TRUE, palette = "RdBu") +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'IMD Scores in NW England', legend.outside = TRUE) +
+  tm_shape(north_west_ccg) +
+  tm_borders('black', lwd = 1)
+
+tmap_arrange(nw_age_std_hyp, northwest_imd)
 
 #### Objective 3 ####
 #### Loading in QOF data from 2014-15 to 2019-20 ####
