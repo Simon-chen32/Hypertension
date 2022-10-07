@@ -250,17 +250,18 @@ lsoa_age_adj <- lsoa_grouped %>%
 ccg_grouped <- merge(lsoa_age_adj, lsoa_ccg_la, by.x = 'lsoa_code', by.y = 'LSOA11CD') 
 
 # comparing mean and median in new df to data reported by GPs 
-mean(lsoa_grouped$hypertension_prevalence) # 14.31%
-median(lsoa_grouped$hypertension_prevalence) #14.57%
+mean(lsoa_grouped$obs_hyper_prev) # 14.31%
+median(lsoa_grouped$obs_hyper_prev) #14.57%
 
 # Creating a Shapefile to plot prevalence by LSOA
 hyper_prev_shp <- merge(ENG_LSOA11, lsoa_age_adj, by.x = 'geo_code', by.y = 'lsoa_code')
 
 tm_shape(hyper_prev_shp) + 
   tm_polygons(col = 'obs_over_exp', border.alpha = 0.5, title = "Observed/Expected Ratio", 
-              legend.hist = TRUE, palette = "-RdBu") +
+              legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
+              labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
-  tm_layout(main.title = 'Hypertension Rates vs Expected', legend.outside = TRUE) 
+  tm_layout(main.title = 'Hypertension Rates vs Expected', legend.outside = TRUE, legend.text.size = 2) 
 
 # create a plot for London
 london_hyper <- merge(London_2011, lsoa_age_adj, by.x = 'LSOA11CD', by.y = 'lsoa_code')
@@ -270,19 +271,6 @@ tm_shape(london_hyper) +
               legend.hist = TRUE, palette = "-RdBu") +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Rates vs Expected by LSOA', legend.outside = TRUE) 
-
-# Generate a Plot at LAD level 
-tm_shape(lad_hypertension) +
-  tm_polygons(col = 'hypertension_prevalence', border.alpha = 0.5, title = "Hypertension Prevalence %", 
-              legend.hist = TRUE, palette = "Blues") +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
-  tm_layout(main.title = 'Hypertension Prevalence by Local Authority', legend.outside = TRUE) 
-
-tm_shape(ldn_boro_hyper) +
-  tm_polygons(col = 'hypertension_prevalence', border.alpha = 0.5, title = "Hypertension Prevalence %", 
-              legend.hist = TRUE, palette = "Blues") +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
-  tm_layout(main.title = 'Hypertension Prevalence by Borough', legend.outside = TRUE) 
 
 # Plot at CCG Level 
 ccg_shp <- merge(Eng_CCG, ccg_region, by = c('CCG21CD', 'CCG21NM'))
@@ -351,7 +339,9 @@ ggplot(midlands_ccg_hyper) +
   geom_boxplot() + coord_flip() +
   geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
              size = 1) +
-  theme(legend.position = "none")
+  theme(legend.position = "none") +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
+       title = "Standardised Hypertension Prevalence by CCG")
 
 tm_shape(midlands_ccg_hyper) +
   tm_fill(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
@@ -368,7 +358,9 @@ ggplot(north_east_hyper) +
   geom_boxplot() + coord_flip() +
   geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
              size = 1) +
-  theme(legend.position = "none")
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
+       title = "Standardised Hypertension Prevalence by CCG")
 
 tm_shape(north_east_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
@@ -384,7 +376,9 @@ ggplot(north_west_hyper) +
   geom_boxplot() + coord_flip() +
   geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
              size = 1) +
-  theme(legend.position = "none")
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
+       title = "Standardised Hypertension Prevalence by CCG")
 
 nw_age_std_hyp <- tm_shape(north_west_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
@@ -394,11 +388,14 @@ nw_age_std_hyp <- tm_shape(north_west_ccg_hyper) +
 tm_shape(north_west_ccg) +
   tm_borders('black', lwd = 1)
 
-tm_shape(north_west_ccg_hyper) +
+nw_ratio <- tm_shape(north_west_ccg_hyper) +
   tm_fill(col = 'obs_over_exp', title = "Obs:Exp Ratio", 
-          legend.hist = TRUE, palette = "-RdBu") +
+          legend.hist = TRUE, palette = "-RdBu",
+          breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
+          labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
-  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in NW England', legend.outside = TRUE) +
+  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in NW England', legend.outside = TRUE,
+            ) +
   tm_shape(north_west_ccg) +
   tm_borders('black', lwd = 1)
 
@@ -408,11 +405,13 @@ ggplot(london_ccg_hyper) +
   geom_boxplot() + coord_flip() +
   geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
              size = 1) +
-  theme(legend.position = "none")
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
+       title = "Standardised Hypertension Prevalence by CCG")
 
 tm_shape(london_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
-              legend.hist = TRUE, palette = "Blues") +
+              legend.hist = TRUE, palette = "-RdBu") +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence by CCG', legend.outside = TRUE) +
 tm_shape(london_ccg) +
@@ -434,7 +433,9 @@ ggplot(south_east_hyper) +
   geom_boxplot() + coord_flip() +
   geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
              size = 1) +
-  theme(legend.position = "none")
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
+       title = "Standardised Hypertension Prevalence by CCG")
 
 tm_shape(south_east_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
@@ -450,7 +451,9 @@ ggplot(south_west_hyper) +
   geom_boxplot() + coord_flip() +
   geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
              size = 1) +
-  theme(legend.position = "none")
+  theme(legend.position = "none") +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
+       title = "Standardised Hypertension Prevalence by CCG")
 
 tm_shape(south_west_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
@@ -466,7 +469,9 @@ ggplot(east_eng_hyper) +
   geom_boxplot() + coord_flip() +
   geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
              size = 1) +
-  theme(legend.position = "none")
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
+       title = "Standardised Hypertension Prevalence by CCG")
 
 tm_shape(east_eng_ccg_hyper) +
   tm_fill(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
@@ -479,15 +484,7 @@ tm_shape(east_eng_ccg) +
 #### Deprivation Analysis ####
 lsoa_hyper_imd <- merge(lsoa_age_adj, LSOA_imd_cl, by.x = 'lsoa_code', by.y = 'lsoa_code_2011')
 
-la_hyper_imd <- merge(lsoa_hyper_imd, lad_region, by.x = 'local_authority_district_code_2019', by.y = 'LAD18CD')
-
 # Investigating the relationship between IMD and Hypertension Prevalence 
-ggplot(lsoa_hyper_imd, aes(x = imd_score, y = age_std_prev)) + 
-  geom_point(aes(color = imd_decile)) +
-  stat_smooth(method = 'lm', col = 'red', size = 1)
-
-# Seems there's little relationship
-
 # Investigate by Region 
 ggplot(ccg_hyper) + 
   aes(x = age_std_prev, color = NHSER21NM, fill = NHSER21NM) + 
@@ -498,25 +495,30 @@ ggplot(ccg_hyper) +
   geom_boxplot() +
   coord_flip() +
   geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
-             size = 1)
+             size = 1) + 
+  labs(x = "Region", y = "Age Standardised Prevalence Rate (%)", 
+       title = "Standardised Hypertension Prevalence by Region")
 
 
 # Investigate relationship between IMD and Hypertension Prevalence
 ggplot(lsoa_hyper_imd, aes(x = imd_score, y = obs_hyper_prev)) + 
   geom_point(aes(color = imd_decile)) +
-  stat_smooth(method = 'lm', col = 'red', size = 1)
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Age Standardised Prevalence Rate")
 
 # Comparing to Expected Hypertension 
 ggplot(lsoa_hyper_imd, aes(x = imd_score, y = exp_hyper_prev)) + 
   geom_point(aes(color = imd_decile)) +
-  stat_smooth(method = 'lm', col = 'red', size = 1)
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Age Standardised Prevalence Rate")
 
 # Seeing how the relationship changes when age adjusted
 ggplot(lsoa_hyper_imd, aes(x = imd_score, y = age_std_prev)) + 
   geom_point(aes(color = imd_decile)) +
-  stat_smooth(method = 'lm', col = 'red', size = 1)
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Age Standardised Prevalence Rate")
 
-
+# London Specific 
 ggplot(london_ccg_hyper) + 
   aes(x = age_std_prev, color = CCG21NM, fill = CCG21NM) + 
   geom_density(alpha = 0.25)
@@ -537,8 +539,6 @@ nw_imd_shp <- merge(nw_imd, LSOA_imd, by.x = 'geo_code', by.y = 'lsoa_code_2011'
 tm_shape(ne_imd_shp) + 
   tm_polygons(col = 'imd_decile', legend.title = "Index of Multiple Deprivation Decile by LSOA") 
 
-tm_shape(nw_imd_shp) + 
-  tm_polygons(col = 'imd_decile', border.alpha = 0.5, palette = '-RdBu') 
 
 northwest_imd <- tm_shape(nw_imd_shp) +
   tm_fill(col = 'imd_decile', title = "IMD Decile",  
@@ -548,7 +548,7 @@ northwest_imd <- tm_shape(nw_imd_shp) +
   tm_shape(north_west_ccg) +
   tm_borders('black', lwd = 1)
 
-tmap_arrange(nw_age_std_hyp, northwest_imd)
+tmap_arrange(nw_age_std_hyp, nw_ratio, northwest_imd)
 
 #### Objective 3 ####
 #### Loading in QOF data from 2014-15 to 2019-20 ####
