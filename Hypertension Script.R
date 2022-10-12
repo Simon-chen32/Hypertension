@@ -170,8 +170,8 @@ Hyper21_22_cl <- Hyper21_22 %>%
   mutate(over80_prev = over80_denominator_21_22/over80_21_22, 
          under79_prev = under79_denominator_21_22/under79_21_22)
 
-gp_to_ccg_21 <- Hyper21_22_cl %>%
-  subset(., select = c(sub_icb_loc_ods_code:practice_code))
+Hyper21_22_cl$over80_achievement_net_exceptions_21_22 <- as.numeric(Hyper21_22_cl$over80_achievement_net_exceptions_21_22)
+Hyper21_22_cl$over80_percent_receiving_intervention_21_22 <- as.numeric(Hyper21_22_cl$over80_percent_receiving_intervention_21_22)
 
 lsoa_hyper_prev <- merge(GP_lsoa_age_data, Hyper21_22_cl, by = 'practice_code') %>%
   # Create new column for the percentage of patients a GP serves in each LSOA 
@@ -239,7 +239,11 @@ lsoa_grouped <- lsoa_hyper_prev %>%
             exp_hyper_prev = sum(exp_hyp*gp_coverage),
             over80_prev = sum(over80_prev*gp_coverage),
             u79_prev = sum(gp_coverage*under79_prev),
-            lsoa_pop = mean(lsoa_pop))
+            lsoa_pop = mean(lsoa_pop), 
+            u79_achievement = sum(gp_coverage*under79_achievement_net_exceptions_21_22), 
+            u79_intervention = sum(gp_coverage*under79_percent_receiving_intervention_21_22), 
+            o80_achievement = sum(gp_coverage*over80_achievement_net_exceptions_21_22), 
+            o80_intervention = sum(gp_coverage*over80_percent_receiving_intervention_21_22))
 
 # merging with expected hypertension rates for males and females 
 lsoa_age_adj <- lsoa_grouped %>%
@@ -316,6 +320,13 @@ ggplot(ccg_hyper) +
              size = 1) +
   theme(legend.position = "none")
 
+ggplot(ccg_hyper) + 
+  aes(x = reorder(CCG21NM, -u79_achievement), y = u79_achievement, color = CCG21NM) + 
+  geom_boxplot() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")
+
 tm_shape(ccg_agg_shp) + 
   tm_polygons(col = 'age_std_prev', border.alpha = 0.8, title = "Age Std. Prevalence %", legend.hist = TRUE, 
               palette = "-RdBu") + 
@@ -333,7 +344,7 @@ tm_shape(Eng_CCG) +
   tm_borders()
 
 # Breaking it Down by Region 
-# Midlands
+# Midlands - Prevalence 
 ggplot(midlands_ccg_hyper) + 
   aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
   geom_boxplot() + coord_flip() +
@@ -342,6 +353,43 @@ ggplot(midlands_ccg_hyper) +
   theme(legend.position = "none") +
   labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
        title = "Standardised Hypertension Prevalence by CCG")
+# Achievement HYP003
+ggplot(midlands_ccg_hyper) + 
+  aes(x = reorder(CCG21NM, -u79_achievement), y = u79_achievement, color = CCG21NM) + 
+  geom_boxplot() + coord_flip() +
+  geom_hline(aes(yintercept=mean(u79_achievement)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none") +
+  labs(y = "Achievement Rate (%)", x = "CCG", 
+       title = "GP Achievement Rates by CCG")
+# Intervention HYP003
+ggplot(midlands_ccg_hyper) + 
+  aes(x = reorder(CCG21NM, -u79_intervention), y = u79_intervention, color = CCG21NM) + 
+  geom_boxplot() + coord_flip() +
+  geom_hline(aes(yintercept=mean(u79_intervention)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none") +
+  labs(y = "Intervention Rate (%)", x = "CCG", 
+       title = "GP Intervention Rates by CCG")
+# Achievement HYP007
+ggplot(midlands_ccg_hyper) + 
+  aes(x = reorder(CCG21NM, -o80_achievement), y =o80_achievement, color = CCG21NM) + 
+  geom_boxplot() + coord_flip() +
+  geom_hline(aes(yintercept=mean(o80_achievement)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none") +
+  labs(y = "Over 80 Achievement Rate (%)", x = "CCG", 
+       title = "GP Achievement Rates in Over 80s by CCG")
+# Intervention HYP007
+ggplot(midlands_ccg_hyper) + 
+  aes(x = reorder(CCG21NM, -o80_intervention), y = o80_intervention, color = CCG21NM) + 
+  geom_boxplot() + coord_flip() +
+  geom_hline(aes(yintercept=mean(o80_intervention)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none") +
+  labs(y = "Over 80 Intervention Rate (%)", x = "CCG", 
+       title = "GP Intervention Rate in Over 80s by CCG")
+
 
 tm_shape(midlands_ccg_hyper) +
   tm_fill(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
@@ -575,6 +623,110 @@ Hyper14_15_cl <- Hyper14_15 %>%
             avg_achievement_14_15 = mean(achievement_net_exceptions_14_15), 
             avg_intervention_14_15 = mean(percent_receiving_intervention_14_15))
 
+age_dist_15 <- read_csv("~/Hypertension/Population Age Distributions/GP_age_dist_2015.csv") %>%
+  clean_names()
+
+# Separating Data into Respective Age Groups
+age_dist_15_cl <- age_dist_15 %>%
+  rename(ccg_code = parent_organisation_code) %>%
+  mutate(male0_15 = rowSums(select(., male_0_1:male_15_16)), 
+         male16_24 = rowSums(select(., male_16_17:male_24_25)), 
+         male25_34 = rowSums(select(., male_25_26:male_34_35)), 
+         male35_44 = rowSums(select(., male_35_36:male_44_45)), 
+         male45_54 = rowSums(select(., male_45_46:male_54_55)), 
+         male55_64 = rowSums(select(., male_55_56:male_64_65)), 
+         male65_74 = rowSums(select(., male_65_66:male_74_75)), 
+         male75plus = rowSums(select(., male_75_76:male_95)), 
+         female0_15 = rowSums(select(., female_0_1:female_15_16)), 
+         female16_24 = rowSums(select(., female_16_17:female_24_25)), 
+         female25_34 = rowSums(select(., female_25_26:female_34_35)), 
+         female35_44 = rowSums(select(., female_35_36:female_44_45)), 
+         female45_54 = rowSums(select(., female_45_46:female_54_55)), 
+         female55_64 = rowSums(select(., female_55_56:female_64_65)), 
+         female65_74 = rowSums(select(., female_65_66:female_74_75)), 
+         female75plus = rowSums(select(., female_75_76:female_95))) %>%
+  select(practice_code, ccg_code, total_all, total_male, total_female, male0_15, male16_24, male25_34, male35_44, male45_54, 
+         male55_64, male65_74, male75plus, female0_15, female16_24, female25_34, female35_44, female45_54, female55_64, 
+         female65_74, female75plus)
+
+# Aggregating data at CCG level
+ccg_age_dist_15 <- age_dist_15_cl %>%
+  group_by(ccg_code) %>%
+  summarise(total_all = sum(total_all), 
+            total_male = sum(total_male), 
+            total_female = sum(total_female), 
+            male0_15 = sum(male0_15), 
+            male16_24 = sum(male16_24), 
+            male25_34 = sum(male25_34), 
+            male35_44 = sum(male35_44), 
+            male45_54 = sum(male45_54), 
+            male55_64 = sum(male55_64), 
+            male65_74 = sum(male65_74), 
+            male75plus = sum(male75plus), 
+            female0_15 = sum(female0_15), 
+            female16_24 = sum(female16_24), 
+            female25_34 = sum(female25_34), 
+            female35_44 = sum(female35_44), 
+            female45_54 = sum(female45_54), 
+            female55_64 = sum(female55_64), 
+            female65_74 = sum(female65_74), 
+            female75plus = sum(female75plus))
+
+# Converting raw totals into percentages
+ccg_age_dist_15 <- ccg_age_dist_15 %>%
+  mutate(male0_15_perc = male0_15/total_male, 
+         male16_24_perc = male16_24/total_male, 
+         male25_34_perc = male25_34/total_male, 
+         male35_44_perc = male35_44/total_male, 
+         male45_54_perc = male45_54/total_male, 
+         male55_64_perc = male55_64/total_male, 
+         male65_74_perc = male65_74/total_male, 
+         male75plus_perc = male75plus/total_male,
+         female0_15_perc = female0_15/total_female,
+         female16_24_perc = female16_24/total_female, 
+         female25_34_perc = female25_34/total_female, 
+         female35_44_perc = female35_44/total_female, 
+         female45_54_perc = female45_54/total_female, 
+         female55_64_perc = female55_64/total_female, 
+         female65_74_perc = female65_74/total_female, 
+         female75plus_perc = female75plus/total_female, 
+         perc_male = total_male/total_all, 
+         perc_female = total_female/total_all)
+
+# calculating expected rates of hypertension 
+ccg_age_dist_15 <- ccg_age_dist_15 %>%
+  mutate(exp_hyp_16_24_male = male16_24_perc*0.00, 
+         exp_hyp_25_34_male = male25_34_perc*0.00, 
+         exp_hyp_35_44_male = male35_44_perc*0.05, 
+         exp_hyp_45_54_male = male45_54_perc*0.13, 
+         exp_hyp_55_64_male = male55_64_perc*0.26, 
+         exp_hyp_65_74_male = male65_74_perc*0.40,
+         exp_hyp_75plus_male = male75plus_perc*0.48,
+         exp_hyp_16_24_female = female16_24_perc*0.00, 
+         exp_hyp_25_34_female = female25_34_perc*0.00, 
+         exp_hyp_35_44_female = female35_44_perc*0.03, 
+         exp_hyp_45_54_female = female45_54_perc*0.09, 
+         exp_hyp_55_64_female = female55_64_perc*0.22, 
+         exp_hyp_65_74_female = female65_74_perc*0.40,
+         exp_hyp_75plus_female = female75plus_perc*0.52, 
+         exp_hyp_male = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
+           exp_hyp_55_64_male + exp_hyp_65_74_male + exp_hyp_75plus_male, 
+         exp_hyp_female = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
+           exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75plus_female)
+
+# getting expected rate for each ccg adjusted for age and gender
+ccg_age_dist_15 <- ccg_age_dist_15 %>%
+  mutate(exp_hyp_14_15 = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100)
+
+hyper_prev_14_15 <- merge(ccg_age_dist_15, Hyper14_15_cl, by = 'ccg_code') %>%
+  # Creating Ratios and Age Standardising
+  mutate(obs_over_exp_15 = avg_prevalence_14_15/exp_hyp_14_15, 
+         age_std_prev_14_15 = avg_prevalence_14_15*obs_over_exp_15) %>%
+  # selecting variables 
+  select(ccg_code, avg_prevalence_14_15, exp_hyp_male, exp_hyp_female, exp_hyp_14_15, total_male, total_female, total_all, 
+         tot_list_size_14_15, tot_register_14_15, tot_numerator_14_15, tot_denominator_14_15, avg_achievement_14_15, 
+         avg_intervention_14_15, obs_over_exp_15, age_std_prev_14_15)
+
 ## 15-16 ##
 Hyper15_16 <- read_csv("~/Hypertension/QOF Data/QOF_Hypertension_15-16.csv", skip = 8) %>%
   clean_names() %>%
@@ -597,6 +749,109 @@ Hyper15_16_cl <- Hyper15_16 %>%
             tot_denominator_15_16 = sum(hyp006_denominator_15_16),
             avg_achievement_15_16 = mean(achievement_net_exceptions_15_16), 
             avg_intervention_15_16 = mean(percent_receiving_intervention_15_16))
+
+age_dist_16 <- read_csv("~/Hypertension/Population Age Distributions/gp_age_dist_2016.csv") %>%
+  clean_names()
+
+# Separating Data into Respective Age Groups
+age_dist_16_cl <- age_dist_16 %>%
+  mutate(male0_15 = rowSums(select(., male_0_1:male_15_16)), 
+         male16_24 = rowSums(select(., male_16_17:male_24_25)), 
+         male25_34 = rowSums(select(., male_25_26:male_34_35)), 
+         male35_44 = rowSums(select(., male_35_36:male_44_45)), 
+         male45_54 = rowSums(select(., male_45_46:male_54_55)), 
+         male55_64 = rowSums(select(., male_55_56:male_64_65)), 
+         male65_74 = rowSums(select(., male_65_66:male_74_75)), 
+         male75plus = rowSums(select(., male_75_76:male_95)), 
+         female0_15 = rowSums(select(., female_0_1:female_15_16)), 
+         female16_24 = rowSums(select(., female_16_17:female_24_25)), 
+         female25_34 = rowSums(select(., female_25_26:female_34_35)), 
+         female35_44 = rowSums(select(., female_35_36:female_44_45)), 
+         female45_54 = rowSums(select(., female_45_46:female_54_55)), 
+         female55_64 = rowSums(select(., female_55_56:female_64_65)), 
+         female65_74 = rowSums(select(., female_65_66:female_74_75)), 
+         female75plus = rowSums(select(., female_75_76:female_95))) %>%
+  select(practice_code, ccg_code, total_all, total_male, total_female, male0_15, male16_24, male25_34, male35_44, male45_54, 
+         male55_64, male65_74, male75plus, female0_15, female16_24, female25_34, female35_44, female45_54, female55_64, 
+         female65_74, female75plus)
+
+# Aggregating data at CCG level
+ccg_age_dist_16 <- age_dist_16_cl %>%
+  group_by(ccg_code) %>%
+  summarise(total_all = sum(total_all), 
+            total_male = sum(total_male), 
+            total_female = sum(total_female), 
+            male0_15 = sum(male0_15), 
+            male16_24 = sum(male16_24), 
+            male25_34 = sum(male25_34), 
+            male35_44 = sum(male35_44), 
+            male45_54 = sum(male45_54), 
+            male55_64 = sum(male55_64), 
+            male65_74 = sum(male65_74), 
+            male75plus = sum(male75plus), 
+            female0_15 = sum(female0_15), 
+            female16_24 = sum(female16_24), 
+            female25_34 = sum(female25_34), 
+            female35_44 = sum(female35_44), 
+            female45_54 = sum(female45_54), 
+            female55_64 = sum(female55_64), 
+            female65_74 = sum(female65_74), 
+            female75plus = sum(female75plus))
+
+# Converting raw totals into percentages
+ccg_age_dist_16 <- ccg_age_dist_16 %>%
+  mutate(male0_15_perc = male0_15/total_male, 
+         male16_24_perc = male16_24/total_male, 
+         male25_34_perc = male25_34/total_male, 
+         male35_44_perc = male35_44/total_male, 
+         male45_54_perc = male45_54/total_male, 
+         male55_64_perc = male55_64/total_male, 
+         male65_74_perc = male65_74/total_male, 
+         male75plus_perc = male75plus/total_male,
+         female0_15_perc = female0_15/total_female,
+         female16_24_perc = female16_24/total_female, 
+         female25_34_perc = female25_34/total_female, 
+         female35_44_perc = female35_44/total_female, 
+         female45_54_perc = female45_54/total_female, 
+         female55_64_perc = female55_64/total_female, 
+         female65_74_perc = female65_74/total_female, 
+         female75plus_perc = female75plus/total_female, 
+         perc_male = total_male/total_all, 
+         perc_female = total_female/total_all)
+
+# calculating expected rates of hypertension 
+ccg_age_dist_16 <- ccg_age_dist_16 %>%
+  mutate(exp_hyp_16_24_male = male16_24_perc*0.00, 
+         exp_hyp_25_34_male = male25_34_perc*0.00, 
+         exp_hyp_35_44_male = male35_44_perc*0.05, 
+         exp_hyp_45_54_male = male45_54_perc*0.12, 
+         exp_hyp_55_64_male = male55_64_perc*0.25, 
+         exp_hyp_65_74_male = male65_74_perc*0.39,
+         exp_hyp_75plus_male = male75plus_perc*0.46,
+         exp_hyp_16_24_female = female16_24_perc*0.00, 
+         exp_hyp_25_34_female = female25_34_perc*0.01, 
+         exp_hyp_35_44_female = female35_44_perc*0.05, 
+         exp_hyp_45_54_female = female45_54_perc*0.11, 
+         exp_hyp_55_64_female = female55_64_perc*0.20, 
+         exp_hyp_65_74_female = female65_74_perc*0.35,
+         exp_hyp_75plus_female = female75plus_perc*0.49, 
+         exp_hyp_male = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
+           exp_hyp_55_64_male + exp_hyp_65_74_male + exp_hyp_75plus_male, 
+         exp_hyp_female = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
+           exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75plus_female)
+
+# getting expected rate for each ccg adjusted for age and gender
+ccg_age_dist_16 <- ccg_age_dist_16 %>%
+  mutate(exp_hyp_15_16 = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100)
+
+hyper_prev_15_16 <- merge(ccg_age_dist_16, Hyper15_16_cl, by = 'ccg_code') %>%
+  # Creating Ratios and Age Standardising
+  mutate(obs_over_exp_16 = avg_prevalence_15_16/exp_hyp_15_16, 
+         age_std_prev_15_16 = avg_prevalence_15_16*obs_over_exp_16) %>%
+  # selecting variables 
+  select(ccg_code, avg_prevalence_15_16, exp_hyp_male, exp_hyp_female, exp_hyp_15_16, total_male, total_female, total_all, 
+         tot_list_size_15_16, tot_register_15_16, tot_numerator_15_16, tot_denominator_15_16, avg_achievement_15_16, 
+         avg_intervention_15_16, obs_over_exp_16, age_std_prev_15_16)
 
 ## 16-17 ##
 Hyper16_17 <- read_csv("~/Hypertension/QOF Data/QOF_Hypertension_16-17.csv", skip = 8) %>%
@@ -625,6 +880,110 @@ Hyper16_17_cl <- Hyper16_17 %>%
             avg_achievement_16_17 = mean(achievement_net_exceptions_16_17), 
             avg_intervention_16_17 = mean(percent_receiving_intervention_16_17))
 
+age_dist_17 <- read_csv("~/Hypertension/Population Age Distributions/gp_age_dist_2017.csv") %>%
+  clean_names()
+
+# Separating Data into Respective Age Groups
+age_dist_17_cl <- age_dist_17 %>%
+  mutate(male0_15 = rowSums(select(., male_0_1:male_15_16)), 
+         male16_24 = rowSums(select(., male_16_17:male_24_25)), 
+         male25_34 = rowSums(select(., male_25_26:male_34_35)), 
+         male35_44 = rowSums(select(., male_35_36:male_44_45)), 
+         male45_54 = rowSums(select(., male_45_46:male_54_55)), 
+         male55_64 = rowSums(select(., male_55_56:male_64_65)), 
+         male65_74 = rowSums(select(., male_65_66:male_74_75)), 
+         male75plus = rowSums(select(., male_75_76:male_95)), 
+         female0_15 = rowSums(select(., female_0_1:female_15_16)), 
+         female16_24 = rowSums(select(., female_16_17:female_24_25)), 
+         female25_34 = rowSums(select(., female_25_26:female_34_35)), 
+         female35_44 = rowSums(select(., female_35_36:female_44_45)), 
+         female45_54 = rowSums(select(., female_45_46:female_54_55)), 
+         female55_64 = rowSums(select(., female_55_56:female_64_65)), 
+         female65_74 = rowSums(select(., female_65_66:female_74_75)), 
+         female75plus = rowSums(select(., female_75_76:female_95))) %>%
+  select(practice_code, ccg_code, total_all, total_male, total_female, male0_15, male16_24, male25_34, male35_44, male45_54, 
+         male55_64, male65_74, male75plus, female0_15, female16_24, female25_34, female35_44, female45_54, female55_64, 
+         female65_74, female75plus)
+
+# Aggregating data at CCG level
+ccg_age_dist_17 <- age_dist_17_cl %>%
+  group_by(ccg_code) %>%
+  summarise(total_all = sum(total_all), 
+            total_male = sum(total_male), 
+            total_female = sum(total_female), 
+            male0_15 = sum(male0_15), 
+            male16_24 = sum(male16_24), 
+            male25_34 = sum(male25_34), 
+            male35_44 = sum(male35_44), 
+            male45_54 = sum(male45_54), 
+            male55_64 = sum(male55_64), 
+            male65_74 = sum(male65_74), 
+            male75plus = sum(male75plus), 
+            female0_15 = sum(female0_15), 
+            female16_24 = sum(female16_24), 
+            female25_34 = sum(female25_34), 
+            female35_44 = sum(female35_44), 
+            female45_54 = sum(female45_54), 
+            female55_64 = sum(female55_64), 
+            female65_74 = sum(female65_74), 
+            female75plus = sum(female75plus))
+
+# Converting raw totals into percentages
+ccg_age_dist_17 <- ccg_age_dist_17 %>%
+  mutate(male0_15_perc = male0_15/total_male, 
+         male16_24_perc = male16_24/total_male, 
+         male25_34_perc = male25_34/total_male, 
+         male35_44_perc = male35_44/total_male, 
+         male45_54_perc = male45_54/total_male, 
+         male55_64_perc = male55_64/total_male, 
+         male65_74_perc = male65_74/total_male, 
+         male75plus_perc = male75plus/total_male,
+         female0_15_perc = female0_15/total_female,
+         female16_24_perc = female16_24/total_female, 
+         female25_34_perc = female25_34/total_female, 
+         female35_44_perc = female35_44/total_female, 
+         female45_54_perc = female45_54/total_female, 
+         female55_64_perc = female55_64/total_female, 
+         female65_74_perc = female65_74/total_female, 
+         female75plus_perc = female75plus/total_female, 
+         perc_male = total_male/total_all, 
+         perc_female = total_female/total_all)
+
+# calculating expected rates of hypertension 
+ccg_age_dist_17 <- ccg_age_dist_17 %>%
+  mutate(exp_hyp_16_24_male = male16_24_perc*0.01, 
+         exp_hyp_25_34_male = male25_34_perc*0.02, 
+         exp_hyp_35_44_male = male35_44_perc*0.06, 
+         exp_hyp_45_54_male = male45_54_perc*0.10, 
+         exp_hyp_55_64_male = male55_64_perc*0.25, 
+         exp_hyp_65_74_male = male65_74_perc*0.39,
+         exp_hyp_75plus_male = male75plus_perc*0.43,
+         exp_hyp_16_24_female = female16_24_perc*0.00, 
+         exp_hyp_25_34_female = female25_34_perc*0.00, 
+         exp_hyp_35_44_female = female35_44_perc*0.03, 
+         exp_hyp_45_54_female = female45_54_perc*0.10, 
+         exp_hyp_55_64_female = female55_64_perc*0.16, 
+         exp_hyp_65_74_female = female65_74_perc*0.32,
+         exp_hyp_75plus_female = female75plus_perc*0.52, 
+         exp_hyp_male = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
+           exp_hyp_55_64_male + exp_hyp_65_74_male + exp_hyp_75plus_male, 
+         exp_hyp_female = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
+           exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75plus_female)
+
+# getting expected rate for each ccg adjusted for age and gender
+ccg_age_dist_17 <- ccg_age_dist_17 %>%
+  mutate(exp_hyp_16_17 = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100)
+
+hyper_prev_16_17 <- merge(ccg_age_dist_17, Hyper16_17_cl, by = 'ccg_code') %>%
+  # Creating Ratios and Age Standardising
+  mutate(obs_over_exp_17 = avg_prevalence_16_17/exp_hyp_16_17, 
+         age_std_prev_16_17 = avg_prevalence_16_17*obs_over_exp_17) %>%
+  # selecting variables 
+  select(ccg_code, avg_prevalence_16_17, exp_hyp_male, exp_hyp_female, exp_hyp_16_17, total_male, total_female, total_all, 
+         tot_list_size_16_17, tot_register_16_17, tot_numerator_16_17, tot_denominator_16_17, avg_achievement_16_17, 
+         avg_intervention_16_17, obs_over_exp_17, age_std_prev_16_17)
+
+
 ## 17-18 ##
 Hyper17_18 <- read_csv("~/Hypertension/QOF Data/QOF_Hypertension_17-18.csv", skip = 8) %>%
   clean_names() %>%
@@ -651,6 +1010,116 @@ Hyper17_18_cl <- Hyper17_18 %>%
             tot_denominator_17_18 = sum(hyp006_denominator_17_18),
             avg_achievement_17_18 = mean(achievement_net_exceptions_17_18), 
             avg_intervention_17_18 = mean(percent_receiving_intervention_17_18))
+
+age_dist_18 <- read_csv("~/Hypertension/Population Age Distributions/gp-reg-pat-prac-quin-age-jan-18.csv") %>%
+  clean_names() 
+
+age_dist_18_cl <- age_dist_18 %>%
+  filter(org_type == "CCG") %>%
+  pivot_wider(names_from = c(age_group_5, sex), 
+              values_from = number_of_patients) %>%
+  clean_names() %>%
+  rename(ccg_code = org_code)
+
+# Separating Data into Respective Age Groups
+age_dist_18_cl <- age_dist_18_cl %>%
+  mutate(male0_15 = rowSums(select(., x0_4_male:x10_14_male)), 
+         male16_24 = rowSums(select(., x15_19_male:x20_24_male)), 
+         male25_34 = rowSums(select(., x25_29_male:x30_34_male)), 
+         male35_44 = rowSums(select(., x35_39_male:x40_44_male)), 
+         male45_54 = rowSums(select(., x45_49_male:x50_54_male)), 
+         male55_64 = rowSums(select(., x55_59_male:x60_64_male)), 
+         male65_74 = rowSums(select(., x65_69_male:x70_74_male)), 
+         male75plus = rowSums(select(., x75_79_male:x95_male)), 
+         female0_15 = rowSums(select(., x0_4_female:x10_14_female)), 
+         female16_24 = rowSums(select(., x15_19_female:x20_24_female)), 
+         female25_34 = rowSums(select(., x25_29_female:x30_34_female)), 
+         female35_44 = rowSums(select(., x35_39_female:x40_44_female)), 
+         female45_54 = rowSums(select(., x45_49_female:x50_54_female)), 
+         female55_64 = rowSums(select(., x55_59_female:x60_64_female)), 
+         female65_74 = rowSums(select(., x65_69_female:x70_74_female)), 
+         female75plus = rowSums(select(., x75_79_female:x95_female))) %>%
+  select(ccg_code, all_all, all_male, all_female, male0_15, male16_24, male25_34, male35_44, male45_54, 
+         male55_64, male65_74, male75plus, female0_15, female16_24, female25_34, female35_44, female45_54, female55_64, 
+         female65_74, female75plus)
+
+# Aggregating data at CCG level
+ccg_age_dist_18 <- age_dist_18_cl %>%
+  group_by(ccg_code) %>%
+  summarise(total_all = sum(all_all), 
+            total_male = sum(all_male), 
+            total_female = sum(all_female), 
+            male0_15 = sum(male0_15), 
+            male16_24 = sum(male16_24), 
+            male25_34 = sum(male25_34), 
+            male35_44 = sum(male35_44), 
+            male45_54 = sum(male45_54), 
+            male55_64 = sum(male55_64), 
+            male65_74 = sum(male65_74), 
+            male75plus = sum(male75plus), 
+            female0_15 = sum(female0_15), 
+            female16_24 = sum(female16_24), 
+            female25_34 = sum(female25_34), 
+            female35_44 = sum(female35_44), 
+            female45_54 = sum(female45_54), 
+            female55_64 = sum(female55_64), 
+            female65_74 = sum(female65_74), 
+            female75plus = sum(female75plus))
+
+# Converting raw totals into percentages
+ccg_age_dist_18 <- ccg_age_dist_18 %>%
+  mutate(male0_15_perc = male0_15/total_male, 
+         male16_24_perc = male16_24/total_male, 
+         male25_34_perc = male25_34/total_male, 
+         male35_44_perc = male35_44/total_male, 
+         male45_54_perc = male45_54/total_male, 
+         male55_64_perc = male55_64/total_male, 
+         male65_74_perc = male65_74/total_male, 
+         male75plus_perc = male75plus/total_male,
+         female0_15_perc = female0_15/total_female,
+         female16_24_perc = female16_24/total_female, 
+         female25_34_perc = female25_34/total_female, 
+         female35_44_perc = female35_44/total_female, 
+         female45_54_perc = female45_54/total_female, 
+         female55_64_perc = female55_64/total_female, 
+         female65_74_perc = female65_74/total_female, 
+         female75plus_perc = female75plus/total_female, 
+         perc_male = total_male/total_all, 
+         perc_female = total_female/total_all)
+
+# calculating expected rates of hypertension 
+ccg_age_dist_18 <- ccg_age_dist_18 %>%
+  mutate(exp_hyp_16_24_male = male16_24_perc*0.00, 
+         exp_hyp_25_34_male = male25_34_perc*0.01, 
+         exp_hyp_35_44_male = male35_44_perc*0.02, 
+         exp_hyp_45_54_male = male45_54_perc*0.15, 
+         exp_hyp_55_64_male = male55_64_perc*0.25, 
+         exp_hyp_65_74_male = male65_74_perc*0.43,
+         exp_hyp_75plus_male = male75plus_perc*0.48,
+         exp_hyp_16_24_female = female16_24_perc*0.00, 
+         exp_hyp_25_34_female = female25_34_perc*0.00, 
+         exp_hyp_35_44_female = female35_44_perc*0.02, 
+         exp_hyp_45_54_female = female45_54_perc*0.11, 
+         exp_hyp_55_64_female = female55_64_perc*0.20, 
+         exp_hyp_65_74_female = female65_74_perc*0.37,
+         exp_hyp_75plus_female = female75plus_perc*0.51, 
+         exp_hyp_male = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
+           exp_hyp_55_64_male + exp_hyp_65_74_male + exp_hyp_75plus_male, 
+         exp_hyp_female = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
+           exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75plus_female)
+
+# getting expected rate for each ccg adjusted for age and gender
+ccg_age_dist_18 <- ccg_age_dist_18 %>%
+  mutate(exp_hyp_17_18 = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100)
+
+hyper_prev_17_18 <- merge(ccg_age_dist_18, Hyper17_18_cl, by = 'ccg_code') %>%
+  # Creating Ratios and Age Standardising
+  mutate(obs_over_exp_18 = avg_prevalence_17_18/exp_hyp_17_18, 
+         age_std_prev_17_18 = avg_prevalence_17_18*obs_over_exp_18) %>%
+  # selecting variables 
+  select(ccg_code, avg_prevalence_17_18, exp_hyp_male, exp_hyp_female, exp_hyp_17_18, total_male, total_female, total_all, 
+         tot_list_size_17_18, tot_register_17_18, tot_numerator_17_18, tot_denominator_17_18, avg_achievement_17_18, 
+         avg_intervention_17_18, obs_over_exp_18, age_std_prev_17_18)
 
 
 ## 18-19 ##
