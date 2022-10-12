@@ -179,54 +179,6 @@ lsoa_hyper_prev <- merge(GP_lsoa_age_data, Hyper21_22_cl, by = 'practice_code') 
          gp_share = (number_of_patients/list_size_21_22)*register_21_22, 
          exp_hyp = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100)
 
-#### Comparing 2019-20 Data to 2021-22 Data #####
-## 19-20 ##
-Hyper19_20 <- read_csv("~/Hypertension/QOF Data/QOF_Hypertension_19-20.csv", skip = 12) %>%
-  clean_names() %>%
-  rename(ccg_code = ccg_ods_code_practice_parent,
-         ccg_geography_code = ccg_ons_code_practice_parent,
-         ccg_name = ccg_name_practice_parent,
-         list_size_19_20 = list_size_11, 
-         under79_19_20 = list_size_79,
-         over80_19_20 = list_size_ages_80,
-         register_19_20 = register_14, 
-         prevalence_percent_19_20 = prevalence_percent_15,
-         under79_numerator_19_20 = numerator_32, 
-         under79_denominator_19_20 = denominator_33, 
-         under79_achievement_net_exceptions_19_20 = net_of_pc_as_percent_34,
-         under79_percent_receiving_intervention_19_20 = intervention_percent_38,
-         over80_numerator_19_20 = numerator_40,
-         over80_denominator_19_20 = denominator_41, 
-         over80_achievement_net_exceptions_19_20 = net_of_pc_as_percent_42,
-         over80_percent_receiving_intervention_19_20 = intervention_percent_46) %>%
-  subset(., under79_denominator_19_20 != 0) %>%
-  subset(., over80_denominator_19_20 != 0)
-
-Hyper19_20$under79_achievement_net_exceptions_19_20 <- as.numeric(Hyper19_20$under79_achievement_net_exceptions_19_20)
-Hyper19_20$under79_percent_receiving_intervention_19_20 <- as.numeric(Hyper19_20$under79_percent_receiving_intervention_19_20)
-Hyper19_20$over80_achievement_net_exceptions_19_20 <- as.numeric(Hyper19_20$over80_achievement_net_exceptions_19_20)
-Hyper19_20$over80_percent_receiving_intervention_19_20 <- as.numeric(Hyper19_20$over80_percent_receiving_intervention_19_20)
-
-Hyper19_20_cl <- Hyper19_20 %>%
-  subset(., select = c(ccg_code, practice_code, list_size_19_20, register_19_20, prevalence_percent_19_20, under79_numerator_19_20, 
-                       under79_denominator_19_20, under79_achievement_net_exceptions_19_20, 
-                       under79_percent_receiving_intervention_19_20, over80_numerator_19_20, over80_denominator_19_20, 
-                       over80_achievement_net_exceptions_19_20, over80_percent_receiving_intervention_19_20))
-
-Hyper19_20_grouped <- Hyper19_20 %>%
-  group_by(ccg_code) %>%
-  summarise(tot_list_size_19_20 = sum(list_size_19_20), 
-            tot_register_19_20 = sum(register_19_20), 
-            avg_prevalence_19_20 = mean(prevalence_percent_19_20), 
-            tot_u79_numerator_19_20 = sum(under79_numerator_19_20), 
-            tot_u79_denominator_19_20 = sum(under79_denominator_19_20),
-            avg_u79_achievement_19_20 = mean(under79_achievement_net_exceptions_19_20), 
-            avg_u79_intervention_19_20 = mean(under79_percent_receiving_intervention_19_20), 
-            tot_o80_numerator_19_20 = sum(over80_numerator_19_20), 
-            tot_o80_denominator_19_20 = sum(over80_denominator_19_20), 
-            avg_o80_achievement_19_20 = mean(over80_achievement_net_exceptions_19_20), 
-            avg_o80_intervention_19_20 = mean(over80_percent_receiving_intervention_19_20))
-
 ### Hypertension Analysis ####
 # checking the mean and median of hypertension prevalence by GP 
 mean(lsoa_hyper_prev$prevalence_percent_21_22) # 12.61%
@@ -240,6 +192,8 @@ lsoa_grouped <- lsoa_hyper_prev %>%
             over80_prev = sum(over80_prev*gp_coverage),
             u79_prev = sum(gp_coverage*under79_prev),
             lsoa_pop = mean(lsoa_pop), 
+            list_size_21_22 = sum(list_size_21_22), 
+            register_21_22 = sum(register_21_22),
             u79_achievement = sum(gp_coverage*under79_achievement_net_exceptions_21_22), 
             u79_intervention = sum(gp_coverage*under79_percent_receiving_intervention_21_22), 
             o80_achievement = sum(gp_coverage*over80_achievement_net_exceptions_21_22), 
@@ -283,12 +237,17 @@ shp_df <- merge(lsoa_ccg_shp, ccg_region, by = c('CCG21CD', 'CCG21NM', 'CCG21CDH
 
 # separate file that aggregates the data
 ccg_agg <- ccg_grouped %>%
-  group_by(CCG21CD, CCG21NM) %>%
-  summarise(obs_hyper_prev = mean(obs_hyper_prev), 
-            exp_hyper_prev = mean(exp_hyper_prev), 
-            obs_over_exp = mean(obs_over_exp), 
-            pop = sum(lsoa_pop), 
-            age_std_prev = mean(age_std_prev))
+  group_by(CCG21CD, CCG21NM, CCG21CDH) %>%
+  summarise(avg_prevalence_21_22 = mean(obs_hyper_prev), 
+            exp_hyp_21_22 = mean(exp_hyper_prev), 
+            obs_over_exp_22 = mean(obs_over_exp), 
+            age_std_prev_21_22 = mean(age_std_prev),
+            tot_list_size_21_22 = sum(list_size_21_22), 
+            tot_register_21_22 = sum(register_21_22),
+            avg_u79_achievement_21_22 = mean(u79_achievement), 
+            avg_u79_intervention_21_22 = mean(u79_intervention), 
+            avg_o80_achievement_21_22 = mean(o80_achievement), 
+            avg_o80_intervention_21_22 = mean(o80_intervention))
 
 ccg_agg_shp <- merge(Eng_CCG, ccg_agg, by = c('CCG21CD', 'CCG21NM'))
 ccg_agg_region <- merge(ccg_agg_shp, ccg_region)
@@ -327,12 +286,14 @@ ggplot(ccg_hyper) +
              size = 1) +
   theme(legend.position = "none")
 
+#### Doesn't Work ####
 tm_shape(ccg_agg_shp) + 
   tm_polygons(col = 'age_std_prev', border.alpha = 0.8, title = "Age Std. Prevalence %", legend.hist = TRUE, 
               palette = "-RdBu") + 
   tm_compass(position = c("right", "top")) +
   tm_scale_bar(position = c("left", "bottom")) + 
   tm_layout(main.title = "Hypertension Prevalence by CCG", legend.outside = TRUE)
+#####################
 
 tm_shape(hyper_prev_shp) + 
   tm_fill(col = 'age_std_prev', border.alpha = 0.8, title = "Age Std. Prevalence %", legend.hist = TRUE, 
@@ -623,54 +584,30 @@ Hyper14_15_cl <- Hyper14_15 %>%
             avg_achievement_14_15 = mean(achievement_net_exceptions_14_15), 
             avg_intervention_14_15 = mean(percent_receiving_intervention_14_15))
 
-age_dist_15 <- read_csv("~/Hypertension/Population Age Distributions/GP_age_dist_2015.csv") %>%
+age_dist_15 <- read_csv("~/Hypertension/Population Age Distributions/gp_age_dist_july_2015.csv") %>%
   clean_names()
 
 # Separating Data into Respective Age Groups
 age_dist_15_cl <- age_dist_15 %>%
-  rename(ccg_code = parent_organisation_code) %>%
-  mutate(male0_15 = rowSums(select(., male_0_1:male_15_16)), 
-         male16_24 = rowSums(select(., male_16_17:male_24_25)), 
-         male25_34 = rowSums(select(., male_25_26:male_34_35)), 
-         male35_44 = rowSums(select(., male_35_36:male_44_45)), 
-         male45_54 = rowSums(select(., male_45_46:male_54_55)), 
-         male55_64 = rowSums(select(., male_55_56:male_64_65)), 
-         male65_74 = rowSums(select(., male_65_66:male_74_75)), 
-         male75plus = rowSums(select(., male_75_76:male_95)), 
-         female0_15 = rowSums(select(., female_0_1:female_15_16)), 
-         female16_24 = rowSums(select(., female_16_17:female_24_25)), 
-         female25_34 = rowSums(select(., female_25_26:female_34_35)), 
-         female35_44 = rowSums(select(., female_35_36:female_44_45)), 
-         female45_54 = rowSums(select(., female_45_46:female_54_55)), 
-         female55_64 = rowSums(select(., female_55_56:female_64_65)), 
-         female65_74 = rowSums(select(., female_65_66:female_74_75)), 
-         female75plus = rowSums(select(., female_75_76:female_95))) %>%
-  select(practice_code, ccg_code, total_all, total_male, total_female, male0_15, male16_24, male25_34, male35_44, male45_54, 
+  mutate(male0_15 = rowSums(select(., male_0_4:male_10_14)), 
+         male16_24 = rowSums(select(., male_15_19:male_20_24)), 
+         male25_34 = rowSums(select(., male_25_29:male_30_34)), 
+         male35_44 = rowSums(select(., male_35_39:male_40_44)), 
+         male45_54 = rowSums(select(., male_45_49:male_50_54)), 
+         male55_64 = rowSums(select(., male_55_59:male_60_64)), 
+         male65_74 = rowSums(select(., male_65_69:male_70_74)), 
+         male75plus = rowSums(select(., male_75_79:male_95)), 
+         female0_15 = rowSums(select(., female_0_4:female_10_14)), 
+         female16_24 = rowSums(select(., female_15_19:female_20_24)), 
+         female25_34 = rowSums(select(., female_25_29:female_30_34)), 
+         female35_44 = rowSums(select(., female_35_39:female_40_44)), 
+         female45_54 = rowSums(select(., female_45_49:female_50_54)), 
+         female55_64 = rowSums(select(., female_55_59:female_60_64)), 
+         female65_74 = rowSums(select(., female_65_69:female_70_74)), 
+         female75plus = rowSums(select(., female_75_79:female_95))) %>%
+  select(ccg_code, total_all, total_male, total_female, male0_15, male16_24, male25_34, male35_44, male45_54, 
          male55_64, male65_74, male75plus, female0_15, female16_24, female25_34, female35_44, female45_54, female55_64, 
          female65_74, female75plus)
-
-# Aggregating data at CCG level
-ccg_age_dist_15 <- age_dist_15_cl %>%
-  group_by(ccg_code) %>%
-  summarise(total_all = sum(total_all), 
-            total_male = sum(total_male), 
-            total_female = sum(total_female), 
-            male0_15 = sum(male0_15), 
-            male16_24 = sum(male16_24), 
-            male25_34 = sum(male25_34), 
-            male35_44 = sum(male35_44), 
-            male45_54 = sum(male45_54), 
-            male55_64 = sum(male55_64), 
-            male65_74 = sum(male65_74), 
-            male75plus = sum(male75plus), 
-            female0_15 = sum(female0_15), 
-            female16_24 = sum(female16_24), 
-            female25_34 = sum(female25_34), 
-            female35_44 = sum(female35_44), 
-            female45_54 = sum(female45_54), 
-            female55_64 = sum(female55_64), 
-            female65_74 = sum(female65_74), 
-            female75plus = sum(female75plus))
 
 # Converting raw totals into percentages
 ccg_age_dist_15 <- ccg_age_dist_15 %>%
@@ -709,21 +646,21 @@ ccg_age_dist_15 <- ccg_age_dist_15 %>%
          exp_hyp_55_64_female = female55_64_perc*0.22, 
          exp_hyp_65_74_female = female65_74_perc*0.40,
          exp_hyp_75plus_female = female75plus_perc*0.52, 
-         exp_hyp_male = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
+         exp_hyp_male_14_15 = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
            exp_hyp_55_64_male + exp_hyp_65_74_male + exp_hyp_75plus_male, 
-         exp_hyp_female = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
+         exp_hyp_female_14_15 = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
            exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75plus_female)
 
 # getting expected rate for each ccg adjusted for age and gender
 ccg_age_dist_15 <- ccg_age_dist_15 %>%
-  mutate(exp_hyp_14_15 = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100)
+  mutate(exp_hyp_14_15 = (exp_hyp_male_14_15*perc_male + exp_hyp_female_14_15*perc_female)*100)
 
 hyper_prev_14_15 <- merge(ccg_age_dist_15, Hyper14_15_cl, by = 'ccg_code') %>%
   # Creating Ratios and Age Standardising
   mutate(obs_over_exp_15 = avg_prevalence_14_15/exp_hyp_14_15, 
          age_std_prev_14_15 = avg_prevalence_14_15*obs_over_exp_15) %>%
   # selecting variables 
-  select(ccg_code, avg_prevalence_14_15, exp_hyp_male, exp_hyp_female, exp_hyp_14_15, total_male, total_female, total_all, 
+  select(ccg_code, avg_prevalence_14_15, exp_hyp_male_14_15, exp_hyp_female_14_15, exp_hyp_14_15, 
          tot_list_size_14_15, tot_register_14_15, tot_numerator_14_15, tot_denominator_14_15, avg_achievement_14_15, 
          avg_intervention_14_15, obs_over_exp_15, age_std_prev_14_15)
 
@@ -738,6 +675,10 @@ Hyper15_16 <- read_csv("~/Hypertension/QOF Data/QOF_Hypertension_15-16.csv", ski
          achievement_net_exceptions_15_16 = underlying_achievement_net_of_exceptions_per_cent,
          percent_receiving_intervention_15_16 = patients_receiving_intervention_per_cent)
 
+# Dropping Practice J84602 as the Practice is in the process of shutting and therefore patient and hypertension prevalance
+# rates don't match (Reported Hypertension Prevalence of 44100%)
+Hyper15_16 <- Hyper15_16[!(Hyper15_16$practice_code == "J84602"),]
+
 Hyper15_16_cl <- Hyper15_16 %>%
   subset(., select = c(ccg_code, list_size_15_16, register_15_16, prevalence_percent_15_16, hyp006_numerator_15_16, 
                        hyp006_denominator_15_16, achievement_net_exceptions_15_16, percent_receiving_intervention_15_16)) %>%
@@ -750,7 +691,9 @@ Hyper15_16_cl <- Hyper15_16 %>%
             avg_achievement_15_16 = mean(achievement_net_exceptions_15_16), 
             avg_intervention_15_16 = mean(percent_receiving_intervention_15_16))
 
-age_dist_16 <- read_csv("~/Hypertension/Population Age Distributions/gp_age_dist_2016.csv") %>%
+
+
+age_dist_16 <- read_csv("~/Hypertension/Population Age Distributions/gp_age_dist_jan_2016.csv") %>%
   clean_names()
 
 # Separating Data into Respective Age Groups
@@ -835,21 +778,21 @@ ccg_age_dist_16 <- ccg_age_dist_16 %>%
          exp_hyp_55_64_female = female55_64_perc*0.20, 
          exp_hyp_65_74_female = female65_74_perc*0.35,
          exp_hyp_75plus_female = female75plus_perc*0.49, 
-         exp_hyp_male = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
+         exp_hyp_male_15_16 = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
            exp_hyp_55_64_male + exp_hyp_65_74_male + exp_hyp_75plus_male, 
-         exp_hyp_female = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
+         exp_hyp_female_15_16 = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
            exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75plus_female)
 
 # getting expected rate for each ccg adjusted for age and gender
 ccg_age_dist_16 <- ccg_age_dist_16 %>%
-  mutate(exp_hyp_15_16 = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100)
+  mutate(exp_hyp_15_16 = (exp_hyp_male_15_16*perc_male + exp_hyp_female_15_16*perc_female)*100)
 
 hyper_prev_15_16 <- merge(ccg_age_dist_16, Hyper15_16_cl, by = 'ccg_code') %>%
   # Creating Ratios and Age Standardising
   mutate(obs_over_exp_16 = avg_prevalence_15_16/exp_hyp_15_16, 
          age_std_prev_15_16 = avg_prevalence_15_16*obs_over_exp_16) %>%
   # selecting variables 
-  select(ccg_code, avg_prevalence_15_16, exp_hyp_male, exp_hyp_female, exp_hyp_15_16, total_male, total_female, total_all, 
+  select(ccg_code, avg_prevalence_15_16, exp_hyp_male_15_16, exp_hyp_female_15_16, exp_hyp_15_16, 
          tot_list_size_15_16, tot_register_15_16, tot_numerator_15_16, tot_denominator_15_16, avg_achievement_15_16, 
          avg_intervention_15_16, obs_over_exp_16, age_std_prev_15_16)
 
@@ -880,37 +823,44 @@ Hyper16_17_cl <- Hyper16_17 %>%
             avg_achievement_16_17 = mean(achievement_net_exceptions_16_17), 
             avg_intervention_16_17 = mean(percent_receiving_intervention_16_17))
 
-age_dist_17 <- read_csv("~/Hypertension/Population Age Distributions/gp_age_dist_2017.csv") %>%
+age_dist_17 <- read_csv("~/Hypertension/Population Age Distributions/gp-reg-pat-prac-quin-age-apr-17.csv") %>%
   clean_names()
 
-# Separating Data into Respective Age Groups
 age_dist_17_cl <- age_dist_17 %>%
-  mutate(male0_15 = rowSums(select(., male_0_1:male_15_16)), 
-         male16_24 = rowSums(select(., male_16_17:male_24_25)), 
-         male25_34 = rowSums(select(., male_25_26:male_34_35)), 
-         male35_44 = rowSums(select(., male_35_36:male_44_45)), 
-         male45_54 = rowSums(select(., male_45_46:male_54_55)), 
-         male55_64 = rowSums(select(., male_55_56:male_64_65)), 
-         male65_74 = rowSums(select(., male_65_66:male_74_75)), 
-         male75plus = rowSums(select(., male_75_76:male_95)), 
-         female0_15 = rowSums(select(., female_0_1:female_15_16)), 
-         female16_24 = rowSums(select(., female_16_17:female_24_25)), 
-         female25_34 = rowSums(select(., female_25_26:female_34_35)), 
-         female35_44 = rowSums(select(., female_35_36:female_44_45)), 
-         female45_54 = rowSums(select(., female_45_46:female_54_55)), 
-         female55_64 = rowSums(select(., female_55_56:female_64_65)), 
-         female65_74 = rowSums(select(., female_65_66:female_74_75)), 
-         female75plus = rowSums(select(., female_75_76:female_95))) %>%
-  select(practice_code, ccg_code, total_all, total_male, total_female, male0_15, male16_24, male25_34, male35_44, male45_54, 
+  filter(org_type == "CCG") %>%
+  pivot_wider(names_from = c(age_group_5, sex), 
+              values_from = number_of_patients) %>%
+  clean_names() %>%
+  rename(ccg_code = org_code)
+
+# Separating Data into Respective Age Groups
+age_dist_17_cl <- age_dist_17_cl %>%
+  mutate(male0_15 = rowSums(select(., x0_4_male:x10_14_male)), 
+         male16_24 = rowSums(select(., x15_19_male:x20_24_male)), 
+         male25_34 = rowSums(select(., x25_29_male:x30_34_male)), 
+         male35_44 = rowSums(select(., x35_39_male:x40_44_male)), 
+         male45_54 = rowSums(select(., x45_49_male:x50_54_male)), 
+         male55_64 = rowSums(select(., x55_59_male:x60_64_male)), 
+         male65_74 = rowSums(select(., x65_69_male:x70_74_male)), 
+         male75plus = rowSums(select(., x75_79_male:x95_male)), 
+         female0_15 = rowSums(select(., x0_4_female:x10_14_female)), 
+         female16_24 = rowSums(select(., x15_19_female:x20_24_female)), 
+         female25_34 = rowSums(select(., x25_29_female:x30_34_female)), 
+         female35_44 = rowSums(select(., x35_39_female:x40_44_female)), 
+         female45_54 = rowSums(select(., x45_49_female:x50_54_female)), 
+         female55_64 = rowSums(select(., x55_59_female:x60_64_female)), 
+         female65_74 = rowSums(select(., x65_69_female:x70_74_female)), 
+         female75plus = rowSums(select(., x75_79_female:x95_female))) %>%
+  select(ccg_code, all_all, all_male, all_female, male0_15, male16_24, male25_34, male35_44, male45_54, 
          male55_64, male65_74, male75plus, female0_15, female16_24, female25_34, female35_44, female45_54, female55_64, 
          female65_74, female75plus)
 
 # Aggregating data at CCG level
 ccg_age_dist_17 <- age_dist_17_cl %>%
   group_by(ccg_code) %>%
-  summarise(total_all = sum(total_all), 
-            total_male = sum(total_male), 
-            total_female = sum(total_female), 
+  summarise(total_all = sum(all_all), 
+            total_male = sum(all_male), 
+            total_female = sum(all_female), 
             male0_15 = sum(male0_15), 
             male16_24 = sum(male16_24), 
             male25_34 = sum(male25_34), 
@@ -965,21 +915,21 @@ ccg_age_dist_17 <- ccg_age_dist_17 %>%
          exp_hyp_55_64_female = female55_64_perc*0.16, 
          exp_hyp_65_74_female = female65_74_perc*0.32,
          exp_hyp_75plus_female = female75plus_perc*0.52, 
-         exp_hyp_male = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
+         exp_hyp_male_16_17 = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
            exp_hyp_55_64_male + exp_hyp_65_74_male + exp_hyp_75plus_male, 
-         exp_hyp_female = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
+         exp_hyp_female_16_17 = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
            exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75plus_female)
 
 # getting expected rate for each ccg adjusted for age and gender
 ccg_age_dist_17 <- ccg_age_dist_17 %>%
-  mutate(exp_hyp_16_17 = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100)
+  mutate(exp_hyp_16_17 = (exp_hyp_male_16_17*perc_male + exp_hyp_female_16_17*perc_female)*100)
 
 hyper_prev_16_17 <- merge(ccg_age_dist_17, Hyper16_17_cl, by = 'ccg_code') %>%
   # Creating Ratios and Age Standardising
   mutate(obs_over_exp_17 = avg_prevalence_16_17/exp_hyp_16_17, 
          age_std_prev_16_17 = avg_prevalence_16_17*obs_over_exp_17) %>%
   # selecting variables 
-  select(ccg_code, avg_prevalence_16_17, exp_hyp_male, exp_hyp_female, exp_hyp_16_17, total_male, total_female, total_all, 
+  select(ccg_code, avg_prevalence_16_17, exp_hyp_male_16_17, exp_hyp_female_16_17, exp_hyp_16_17, 
          tot_list_size_16_17, tot_register_16_17, tot_numerator_16_17, tot_denominator_16_17, avg_achievement_16_17, 
          avg_intervention_16_17, obs_over_exp_17, age_std_prev_16_17)
 
@@ -1011,7 +961,7 @@ Hyper17_18_cl <- Hyper17_18 %>%
             avg_achievement_17_18 = mean(achievement_net_exceptions_17_18), 
             avg_intervention_17_18 = mean(percent_receiving_intervention_17_18))
 
-age_dist_18 <- read_csv("~/Hypertension/Population Age Distributions/gp-reg-pat-prac-quin-age-jan-18.csv") %>%
+age_dist_18 <- read_csv("~/Hypertension/Population Age Distributions/gp-reg-pat-prac-quin-age-apr-18.csv") %>%
   clean_names() 
 
 age_dist_18_cl <- age_dist_18 %>%
@@ -1103,21 +1053,21 @@ ccg_age_dist_18 <- ccg_age_dist_18 %>%
          exp_hyp_55_64_female = female55_64_perc*0.20, 
          exp_hyp_65_74_female = female65_74_perc*0.37,
          exp_hyp_75plus_female = female75plus_perc*0.51, 
-         exp_hyp_male = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
+         exp_hyp_male_17_18 = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
            exp_hyp_55_64_male + exp_hyp_65_74_male + exp_hyp_75plus_male, 
-         exp_hyp_female = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
+         exp_hyp_female_17_18 = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
            exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75plus_female)
 
 # getting expected rate for each ccg adjusted for age and gender
 ccg_age_dist_18 <- ccg_age_dist_18 %>%
-  mutate(exp_hyp_17_18 = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100)
+  mutate(exp_hyp_17_18 = (exp_hyp_male_17_18*perc_male + exp_hyp_female_17_18*perc_female)*100)
 
 hyper_prev_17_18 <- merge(ccg_age_dist_18, Hyper17_18_cl, by = 'ccg_code') %>%
   # Creating Ratios and Age Standardising
   mutate(obs_over_exp_18 = avg_prevalence_17_18/exp_hyp_17_18, 
          age_std_prev_17_18 = avg_prevalence_17_18*obs_over_exp_18) %>%
   # selecting variables 
-  select(ccg_code, avg_prevalence_17_18, exp_hyp_male, exp_hyp_female, exp_hyp_17_18, total_male, total_female, total_all, 
+  select(ccg_code, avg_prevalence_17_18, exp_hyp_male_17_18, exp_hyp_female_17_18, exp_hyp_17_18, 
          tot_list_size_17_18, tot_register_17_18, tot_numerator_17_18, tot_denominator_17_18, avg_achievement_17_18, 
          avg_intervention_17_18, obs_over_exp_18, age_std_prev_17_18)
 
@@ -1147,33 +1097,416 @@ Hyper18_19_cl <- Hyper18_19 %>%
             avg_achievement_18_19 = mean(achievement_net_exceptions_18_19), 
             avg_intervention_18_19 = mean(percent_receiving_intervention_18_19))
 
+age_dist_19 <- read_csv("~/Hypertension/Population Age Distributions/gp-reg-pat-prac-quin-age-apr-19.csv") %>%
+  clean_names() 
+
+age_dist_19_cl <- age_dist_19 %>%
+  filter(org_type == "CCG") %>%
+  pivot_wider(names_from = c(age_group_5, sex), 
+              values_from = number_of_patients) %>%
+  clean_names() %>%
+  rename(ccg_code = org_code)
+
+# Separating Data into Respective Age Groups
+age_dist_19_cl <- age_dist_19_cl %>%
+  mutate(male0_15 = rowSums(select(., x0_4_male:x10_14_male)), 
+         male16_24 = rowSums(select(., x15_19_male:x20_24_male)), 
+         male25_34 = rowSums(select(., x25_29_male:x30_34_male)), 
+         male35_44 = rowSums(select(., x35_39_male:x40_44_male)), 
+         male45_54 = rowSums(select(., x45_49_male:x50_54_male)), 
+         male55_64 = rowSums(select(., x55_59_male:x60_64_male)), 
+         male65_74 = rowSums(select(., x65_69_male:x70_74_male)), 
+         male75plus = rowSums(select(., x75_79_male:x95_male)), 
+         female0_15 = rowSums(select(., x0_4_female:x10_14_female)), 
+         female16_24 = rowSums(select(., x15_19_female:x20_24_female)), 
+         female25_34 = rowSums(select(., x25_29_female:x30_34_female)), 
+         female35_44 = rowSums(select(., x35_39_female:x40_44_female)), 
+         female45_54 = rowSums(select(., x45_49_female:x50_54_female)), 
+         female55_64 = rowSums(select(., x55_59_female:x60_64_female)), 
+         female65_74 = rowSums(select(., x65_69_female:x70_74_female)), 
+         female75plus = rowSums(select(., x75_79_female:x95_female))) %>%
+  select(ccg_code, all_all, all_male, all_female, male0_15, male16_24, male25_34, male35_44, male45_54, 
+         male55_64, male65_74, male75plus, female0_15, female16_24, female25_34, female35_44, female45_54, female55_64, 
+         female65_74, female75plus)
+
+# Aggregating data at CCG level
+ccg_age_dist_19 <- age_dist_19_cl %>%
+  group_by(ccg_code) %>%
+  summarise(total_all = sum(all_all), 
+            total_male = sum(all_male), 
+            total_female = sum(all_female), 
+            male0_15 = sum(male0_15), 
+            male16_24 = sum(male16_24), 
+            male25_34 = sum(male25_34), 
+            male35_44 = sum(male35_44), 
+            male45_54 = sum(male45_54), 
+            male55_64 = sum(male55_64), 
+            male65_74 = sum(male65_74), 
+            male75plus = sum(male75plus), 
+            female0_15 = sum(female0_15), 
+            female16_24 = sum(female16_24), 
+            female25_34 = sum(female25_34), 
+            female35_44 = sum(female35_44), 
+            female45_54 = sum(female45_54), 
+            female55_64 = sum(female55_64), 
+            female65_74 = sum(female65_74), 
+            female75plus = sum(female75plus))
+
+# Converting raw totals into percentages
+ccg_age_dist_19 <- ccg_age_dist_19 %>%
+  mutate(male0_15_perc = male0_15/total_male, 
+         male16_24_perc = male16_24/total_male, 
+         male25_34_perc = male25_34/total_male, 
+         male35_44_perc = male35_44/total_male, 
+         male45_54_perc = male45_54/total_male, 
+         male55_64_perc = male55_64/total_male, 
+         male65_74_perc = male65_74/total_male, 
+         male75plus_perc = male75plus/total_male,
+         female0_15_perc = female0_15/total_female,
+         female16_24_perc = female16_24/total_female, 
+         female25_34_perc = female25_34/total_female, 
+         female35_44_perc = female35_44/total_female, 
+         female45_54_perc = female45_54/total_female, 
+         female55_64_perc = female55_64/total_female, 
+         female65_74_perc = female65_74/total_female, 
+         female75plus_perc = female75plus/total_female, 
+         perc_male = total_male/total_all, 
+         perc_female = total_female/total_all)
+
+# calculating expected rates of hypertension 
+ccg_age_dist_19 <- ccg_age_dist_19 %>%
+  mutate(exp_hyp_16_24_male = male16_24_perc*0.00, 
+         exp_hyp_25_34_male = male25_34_perc*0.01, 
+         exp_hyp_35_44_male = male35_44_perc*0.02, 
+         exp_hyp_45_54_male = male45_54_perc*0.15, 
+         exp_hyp_55_64_male = male55_64_perc*0.25, 
+         exp_hyp_65_74_male = male65_74_perc*0.43,
+         exp_hyp_75plus_male = male75plus_perc*0.48,
+         exp_hyp_16_24_female = female16_24_perc*0.00, 
+         exp_hyp_25_34_female = female25_34_perc*0.00, 
+         exp_hyp_35_44_female = female35_44_perc*0.02, 
+         exp_hyp_45_54_female = female45_54_perc*0.11, 
+         exp_hyp_55_64_female = female55_64_perc*0.20, 
+         exp_hyp_65_74_female = female65_74_perc*0.37,
+         exp_hyp_75plus_female = female75plus_perc*0.51, 
+         exp_hyp_male_18_19 = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
+           exp_hyp_55_64_male + exp_hyp_65_74_male + exp_hyp_75plus_male, 
+         exp_hyp_female_18_19 = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
+           exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75plus_female)
+
+# getting expected rate for each ccg adjusted for age and gender
+ccg_age_dist_19 <- ccg_age_dist_19 %>%
+  mutate(exp_hyp_18_19 = (exp_hyp_male_18_19*perc_male + exp_hyp_female_18_19*perc_female)*100)
+
+hyper_prev_18_19 <- merge(ccg_age_dist_19, Hyper18_19_cl, by = 'ccg_code') %>%
+  # Creating Ratios and Age Standardising
+  mutate(obs_over_exp_19 = avg_prevalence_18_19/exp_hyp_18_19, 
+         age_std_prev_18_19 = avg_prevalence_18_19*obs_over_exp_19) %>%
+  # selecting variables 
+  select(ccg_code, avg_prevalence_18_19, exp_hyp_18_19, exp_hyp_male_18_19, exp_hyp_female_18_19,
+         tot_list_size_18_19, tot_register_18_19, tot_numerator_18_19, tot_denominator_18_19, avg_achievement_18_19, 
+         avg_intervention_18_19, obs_over_exp_19, age_std_prev_18_19)
+
+## 19-20 ##
+Hyper19_20 <- read_csv("~/Hypertension/QOF Data/QOF_Hypertension_19-20.csv", skip = 12) %>%
+  clean_names() %>%
+  rename(ccg_code = ccg_ods_code_practice_parent,
+         ccg_geography_code = ccg_ons_code_practice_parent,
+         ccg_name = ccg_name_practice_parent,
+         list_size_19_20 = list_size_11, 
+         under79_19_20 = list_size_79,
+         over80_19_20 = list_size_ages_80,
+         register_19_20 = register_14, 
+         prevalence_percent_19_20 = prevalence_percent_15,
+         under79_numerator_19_20 = numerator_32, 
+         under79_denominator_19_20 = denominator_33, 
+         under79_achievement_net_exceptions_19_20 = net_of_pc_as_percent_34,
+         under79_percent_receiving_intervention_19_20 = intervention_percent_38,
+         over80_numerator_19_20 = numerator_40,
+         over80_denominator_19_20 = denominator_41, 
+         over80_achievement_net_exceptions_19_20 = net_of_pc_as_percent_42,
+         over80_percent_receiving_intervention_19_20 = intervention_percent_46) %>%
+  subset(., under79_denominator_19_20 != 0) %>%
+  subset(., over80_denominator_19_20 != 0)
+
+Hyper19_20$under79_achievement_net_exceptions_19_20 <- as.numeric(Hyper19_20$under79_achievement_net_exceptions_19_20)
+Hyper19_20$under79_percent_receiving_intervention_19_20 <- as.numeric(Hyper19_20$under79_percent_receiving_intervention_19_20)
+Hyper19_20$over80_achievement_net_exceptions_19_20 <- as.numeric(Hyper19_20$over80_achievement_net_exceptions_19_20)
+Hyper19_20$over80_percent_receiving_intervention_19_20 <- as.numeric(Hyper19_20$over80_percent_receiving_intervention_19_20)
+
+Hyper19_20_cl <- Hyper19_20 %>%
+  group_by(ccg_code) %>%
+  summarise(tot_list_size_19_20 = sum(list_size_19_20), 
+            tot_register_19_20 = sum(register_19_20), 
+            avg_prevalence_19_20 = mean(prevalence_percent_19_20), 
+            tot_u79_numerator_19_20 = sum(under79_numerator_19_20), 
+            tot_u79_denominator_19_20 = sum(under79_denominator_19_20),
+            avg_u79_achievement_19_20 = mean(under79_achievement_net_exceptions_19_20), 
+            avg_u79_intervention_19_20 = mean(under79_percent_receiving_intervention_19_20), 
+            tot_o80_numerator_19_20 = sum(over80_numerator_19_20), 
+            tot_o80_denominator_19_20 = sum(over80_denominator_19_20), 
+            avg_o80_achievement_19_20 = mean(over80_achievement_net_exceptions_19_20), 
+            avg_o80_intervention_19_20 = mean(over80_percent_receiving_intervention_19_20)) 
+
+age_dist_20 <- read_csv("~/Hypertension/Population Age Distributions/gp-reg-pat-prac-quin-age-apr-20.csv") %>%
+  clean_names() 
+
+age_dist_20_cl <- age_dist_20 %>%
+  filter(org_type == "CCG") %>%
+  pivot_wider(names_from = c(age_group_5, sex), 
+              values_from = number_of_patients) %>%
+  clean_names() %>%
+  rename(ccg_code = org_code)
+
+# Separating Data into Respective Age Groups
+age_dist_20_cl <- age_dist_20_cl %>%
+  mutate(male0_15 = rowSums(select(., x0_4_male:x10_14_male)), 
+         male16_24 = rowSums(select(., x15_19_male:x20_24_male)), 
+         male25_34 = rowSums(select(., x25_29_male:x30_34_male)), 
+         male35_44 = rowSums(select(., x35_39_male:x40_44_male)), 
+         male45_54 = rowSums(select(., x45_49_male:x50_54_male)), 
+         male55_64 = rowSums(select(., x55_59_male:x60_64_male)), 
+         male65_74 = rowSums(select(., x65_69_male:x70_74_male)), 
+         male75plus = rowSums(select(., x75_79_male:x95_male)), 
+         female0_15 = rowSums(select(., x0_4_female:x10_14_female)), 
+         female16_24 = rowSums(select(., x15_19_female:x20_24_female)), 
+         female25_34 = rowSums(select(., x25_29_female:x30_34_female)), 
+         female35_44 = rowSums(select(., x35_39_female:x40_44_female)), 
+         female45_54 = rowSums(select(., x45_49_female:x50_54_female)), 
+         female55_64 = rowSums(select(., x55_59_female:x60_64_female)), 
+         female65_74 = rowSums(select(., x65_69_female:x70_74_female)), 
+         female75plus = rowSums(select(., x75_79_female:x95_female))) %>%
+  select(ccg_code, all_all, all_male, all_female, male0_15, male16_24, male25_34, male35_44, male45_54, 
+         male55_64, male65_74, male75plus, female0_15, female16_24, female25_34, female35_44, female45_54, female55_64, 
+         female65_74, female75plus)
+
+# Aggregating data at CCG level
+ccg_age_dist_20 <- age_dist_20_cl %>%
+  group_by(ccg_code) %>%
+  summarise(total_all = sum(all_all), 
+            total_male = sum(all_male), 
+            total_female = sum(all_female), 
+            male0_15 = sum(male0_15), 
+            male16_24 = sum(male16_24), 
+            male25_34 = sum(male25_34), 
+            male35_44 = sum(male35_44), 
+            male45_54 = sum(male45_54), 
+            male55_64 = sum(male55_64), 
+            male65_74 = sum(male65_74), 
+            male75plus = sum(male75plus), 
+            female0_15 = sum(female0_15), 
+            female16_24 = sum(female16_24), 
+            female25_34 = sum(female25_34), 
+            female35_44 = sum(female35_44), 
+            female45_54 = sum(female45_54), 
+            female55_64 = sum(female55_64), 
+            female65_74 = sum(female65_74), 
+            female75plus = sum(female75plus))
+
+# Converting raw totals into percentages
+ccg_age_dist_20 <- ccg_age_dist_20 %>%
+  mutate(male0_15_perc = male0_15/total_male, 
+         male16_24_perc = male16_24/total_male, 
+         male25_34_perc = male25_34/total_male, 
+         male35_44_perc = male35_44/total_male, 
+         male45_54_perc = male45_54/total_male, 
+         male55_64_perc = male55_64/total_male, 
+         male65_74_perc = male65_74/total_male, 
+         male75plus_perc = male75plus/total_male,
+         female0_15_perc = female0_15/total_female,
+         female16_24_perc = female16_24/total_female, 
+         female25_34_perc = female25_34/total_female, 
+         female35_44_perc = female35_44/total_female, 
+         female45_54_perc = female45_54/total_female, 
+         female55_64_perc = female55_64/total_female, 
+         female65_74_perc = female65_74/total_female, 
+         female75plus_perc = female75plus/total_female, 
+         perc_male = total_male/total_all, 
+         perc_female = total_female/total_all)
+
+# calculating expected rates of hypertension 
+ccg_age_dist_20 <- ccg_age_dist_20 %>%
+  mutate(exp_hyp_16_24_male = male16_24_perc*0.01, 
+         exp_hyp_25_34_male = male25_34_perc*0.01, 
+         exp_hyp_35_44_male = male35_44_perc*0.03, 
+         exp_hyp_45_54_male = male45_54_perc*0.10, 
+         exp_hyp_55_64_male = male55_64_perc*0.26, 
+         exp_hyp_65_74_male = male65_74_perc*0.38,
+         exp_hyp_75plus_male = male75plus_perc*0.53,
+         exp_hyp_16_24_female = female16_24_perc*0.00, 
+         exp_hyp_25_34_female = female25_34_perc*0.01, 
+         exp_hyp_35_44_female = female35_44_perc*0.02, 
+         exp_hyp_45_54_female = female45_54_perc*0.09, 
+         exp_hyp_55_64_female = female55_64_perc*0.19, 
+         exp_hyp_65_74_female = female65_74_perc*0.32,
+         exp_hyp_75plus_female = female75plus_perc*0.46, 
+         exp_hyp_male_19_20 = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
+           exp_hyp_55_64_male + exp_hyp_65_74_male + exp_hyp_75plus_male, 
+         exp_hyp_female_19_20 = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
+           exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75plus_female)
+
+# getting expected rate for each ccg adjusted for age and gender
+ccg_age_dist_20 <- ccg_age_dist_20 %>%
+  mutate(exp_hyp_19_20 = (exp_hyp_male_19_20*perc_male + exp_hyp_female_19_20*perc_female)*100)
+
+hyper_prev_19_20 <- merge(ccg_age_dist_20, Hyper19_20_cl, by = 'ccg_code') %>%
+  # Creating Ratios and Age Standardising
+  mutate(obs_over_exp_20 = avg_prevalence_19_20/exp_hyp_19_20, 
+         age_std_prev_19_20 = avg_prevalence_19_20*obs_over_exp_20) %>%
+  # selecting variables 
+  select(ccg_code, avg_prevalence_19_20, exp_hyp_19_20, exp_hyp_male_19_20, exp_hyp_female_19_20,
+         tot_list_size_19_20, tot_register_19_20, tot_u79_numerator_19_20, tot_u79_denominator_19_20, 
+         avg_u79_achievement_19_20, avg_u79_intervention_19_20, tot_o80_numerator_19_20, 
+         tot_o80_denominator_19_20, avg_o80_achievement_19_20, avg_o80_intervention_19_20,
+         obs_over_exp_20, age_std_prev_19_20)
+
+## 20-21 ##
+Hyper20_21 <- read_csv("~/Hypertension/QOF Data/QOF_Hypertension_20-21.csv", skip = 12) %>%
+  clean_names() %>%
+  rename(ccg_code = ccg_ods_code_practice_parent,
+         ccg_geography_code = ccg_ons_code_practice_parent,
+         ccg_name = ccg_name_practice_parent,
+         list_size_20_21 = list_size_11, 
+         register_20_21 = register_12, 
+         prevalence_percent_20_21 = prevalence_percent_13)
+
+Hyper20_21_cl <- Hyper20_21 %>%
+  group_by(ccg_code) %>%
+  summarise(tot_list_size_20_21 = sum(list_size_20_21), 
+            tot_register_20_21 = sum(register_20_21), 
+            avg_prevalence_20_21 = mean(prevalence_percent_20_21))
+
+# Age Distribution Data
+age_dist_21 <- read_csv("~/Hypertension/Population Age Distributions/gp-reg-pat-prac-quin-age-may-21.csv") %>%
+  clean_names() 
+
+age_dist_21_cl <- age_dist_21 %>%
+  filter(org_type == "CCG") %>%
+  pivot_wider(names_from = c(age_group_5, sex), 
+              values_from = number_of_patients) %>%
+  clean_names() %>%
+  rename(ccg_code = org_code)
+
+# Separating Data into Respective Age Groups
+age_dist_21_cl <- age_dist_21_cl %>%
+  mutate(male0_15 = rowSums(select(., x0_4_male:x10_14_male)), 
+         male16_24 = rowSums(select(., x15_19_male:x20_24_male)), 
+         male25_34 = rowSums(select(., x25_29_male:x30_34_male)), 
+         male35_44 = rowSums(select(., x35_39_male:x40_44_male)), 
+         male45_54 = rowSums(select(., x45_49_male:x50_54_male)), 
+         male55_64 = rowSums(select(., x55_59_male:x60_64_male)), 
+         male65_74 = rowSums(select(., x65_69_male:x70_74_male)), 
+         male75plus = rowSums(select(., x75_79_male:x95_male)), 
+         female0_15 = rowSums(select(., x0_4_female:x10_14_female)), 
+         female16_24 = rowSums(select(., x15_19_female:x20_24_female)), 
+         female25_34 = rowSums(select(., x25_29_female:x30_34_female)), 
+         female35_44 = rowSums(select(., x35_39_female:x40_44_female)), 
+         female45_54 = rowSums(select(., x45_49_female:x50_54_female)), 
+         female55_64 = rowSums(select(., x55_59_female:x60_64_female)), 
+         female65_74 = rowSums(select(., x65_69_female:x70_74_female)), 
+         female75plus = rowSums(select(., x75_79_female:x95_female))) %>%
+  select(ccg_code, all_all, all_male, all_female, male0_15, male16_24, male25_34, male35_44, male45_54, 
+         male55_64, male65_74, male75plus, female0_15, female16_24, female25_34, female35_44, female45_54, female55_64, 
+         female65_74, female75plus)
+
+# Aggregating data at CCG level
+ccg_age_dist_21 <- age_dist_21_cl %>%
+  group_by(ccg_code) %>%
+  summarise(total_all = sum(all_all), 
+            total_male = sum(all_male), 
+            total_female = sum(all_female), 
+            male0_15 = sum(male0_15), 
+            male16_24 = sum(male16_24), 
+            male25_34 = sum(male25_34), 
+            male35_44 = sum(male35_44), 
+            male45_54 = sum(male45_54), 
+            male55_64 = sum(male55_64), 
+            male65_74 = sum(male65_74), 
+            male75plus = sum(male75plus), 
+            female0_15 = sum(female0_15), 
+            female16_24 = sum(female16_24), 
+            female25_34 = sum(female25_34), 
+            female35_44 = sum(female35_44), 
+            female45_54 = sum(female45_54), 
+            female55_64 = sum(female55_64), 
+            female65_74 = sum(female65_74), 
+            female75plus = sum(female75plus))
+
+# Converting raw totals into percentages
+ccg_age_dist_21 <- ccg_age_dist_21 %>%
+  mutate(male0_15_perc = male0_15/total_male, 
+         male16_24_perc = male16_24/total_male, 
+         male25_34_perc = male25_34/total_male, 
+         male35_44_perc = male35_44/total_male, 
+         male45_54_perc = male45_54/total_male, 
+         male55_64_perc = male55_64/total_male, 
+         male65_74_perc = male65_74/total_male, 
+         male75plus_perc = male75plus/total_male,
+         female0_15_perc = female0_15/total_female,
+         female16_24_perc = female16_24/total_female, 
+         female25_34_perc = female25_34/total_female, 
+         female35_44_perc = female35_44/total_female, 
+         female45_54_perc = female45_54/total_female, 
+         female55_64_perc = female55_64/total_female, 
+         female65_74_perc = female65_74/total_female, 
+         female75plus_perc = female75plus/total_female, 
+         perc_male = total_male/total_all, 
+         perc_female = total_female/total_all)
+
+# calculating expected rates of hypertension 
+ccg_age_dist_21 <- ccg_age_dist_21 %>%
+  mutate(exp_hyp_16_24_male = male16_24_perc*0.01, 
+         exp_hyp_25_34_male = male25_34_perc*0.01, 
+         exp_hyp_35_44_male = male35_44_perc*0.03, 
+         exp_hyp_45_54_male = male45_54_perc*0.10, 
+         exp_hyp_55_64_male = male55_64_perc*0.26, 
+         exp_hyp_65_74_male = male65_74_perc*0.38,
+         exp_hyp_75plus_male = male75plus_perc*0.53,
+         exp_hyp_16_24_female = female16_24_perc*0.00, 
+         exp_hyp_25_34_female = female25_34_perc*0.01, 
+         exp_hyp_35_44_female = female35_44_perc*0.02, 
+         exp_hyp_45_54_female = female45_54_perc*0.09, 
+         exp_hyp_55_64_female = female55_64_perc*0.19, 
+         exp_hyp_65_74_female = female65_74_perc*0.32,
+         exp_hyp_75plus_female = female75plus_perc*0.46, 
+         exp_hyp_male_20_21 = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
+           exp_hyp_55_64_male + exp_hyp_65_74_male + exp_hyp_75plus_male, 
+         exp_hyp_female_20_21 = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
+           exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75plus_female)
+
+# getting expected rate for each ccg adjusted for age and gender
+ccg_age_dist_21 <- ccg_age_dist_21 %>%
+  mutate(exp_hyp_20_21 = (exp_hyp_male_20_21*perc_male + exp_hyp_female_20_21*perc_female)*100)
+
+hyper_prev_20_21 <- merge(ccg_age_dist_21, Hyper20_21_cl, by = 'ccg_code') %>%
+  # Creating Ratios and Age Standardising
+  mutate(obs_over_exp_21 = avg_prevalence_20_21/exp_hyp_20_21, 
+         age_std_prev_20_21 = avg_prevalence_20_21*obs_over_exp_21) %>%
+  # selecting variables 
+  select(ccg_code, avg_prevalence_20_21, exp_hyp_20_21, exp_hyp_male_20_21, exp_hyp_female_20_21,
+         tot_list_size_20_21, tot_register_20_21, 
+         obs_over_exp_21, age_std_prev_20_21)
+
+
 # Load in Data to Change the CCG Codes
-ccg_2019_codes <- read_csv("merges_up_to_2019.csv") %>%
+ccg_2019_codes <- read_csv("~/Hypertension/CCG merge data/merges_up_to_2019.csv") %>%
   clean_names()
-ccg_2020_codes <- read_csv("merges_2020.csv") %>%
+ccg_2020_codes <- read_csv("~/Hypertension/CCG merge data/merges_2020.csv") %>%
   clean_names()
-ccg_2021_codes <- read_csv("merges_2021.csv") %>%
+ccg_2021_codes <- read_csv("~/Hypertension/CCG merge data/merges_2021.csv") %>%
   clean_names()
 
 #### Merging Data ####
-# Merging the two GP datasets
-GP_data <- merge(GP_age_dist_wide, GP_imd_cl, all = TRUE) %>%
-  rename(imd_value = value)
-
-
-# Mergining GP Data to Shapefile 
-GP_shp <- merge(Eng_CCG, GP_data, by.x = c('CCG21CD'), by.y = c('parent_code'))
-
 # Merging by CCG 
-QOF_16 <- merge(Hyper14_15_cl, Hyper15_16_cl, by = "ccg_code", all = TRUE)
+QOF_16 <- merge(hyper_prev_14_15, hyper_prev_15_16, by = "ccg_code", all = TRUE)
 
-QOF_17 <- merge(QOF_16, Hyper16_17_cl, by = 'ccg_code', all = TRUE)
+QOF_17 <- merge(QOF_16, hyper_prev_16_17, by = 'ccg_code', all = TRUE)
 # Changing CCG codes as CCGs merge
 QOF_17$ccg_code[QOF_17$ccg_code == "00W"] <- "14L"
 QOF_17$ccg_code[QOF_17$ccg_code == "01M"] <- "14L"
 QOF_17$ccg_code[QOF_17$ccg_code == "01N"] <- "14L"
 
-QOF_18 <- merge(QOF_17, Hyper17_18_cl, by = 'ccg_code', all = TRUE)
+QOF_18 <- merge(QOF_17, hyper_prev_17_18, by = 'ccg_code', all = TRUE)
 # Changing more CCG Codes - 14Y 
 # Note: 14Y does not appear until 2018/19, as Buckinghamshire CCG data is excluded for the 2017/18 year due to small sample size 
 #       and participation in an alternative payment scheme 
@@ -1202,7 +1535,7 @@ QOF_18$ccg_code[QOF_18$ccg_code == "02V"] <- "15F"
 QOF_18$ccg_code[QOF_18$ccg_code == "03C"] <- "15F"
 QOF_18$ccg_code[QOF_18$ccg_code == "03G"] <- "15F"
 
-QOF_19 <- merge(QOF_18, Hyper18_19_cl, by = 'ccg_code', all = TRUE)
+QOF_19 <- merge(QOF_18, hyper_prev_18_19, by = 'ccg_code', all = TRUE)
 # 15M
 QOF_19$ccg_code[QOF_19$ccg_code == "03X"] <- "15M"
 QOF_19$ccg_code[QOF_19$ccg_code == "03Y"] <- "15M"
@@ -1219,16 +1552,110 @@ QOF_19_to_20 <- QOF_19_data %>%
                                  TRUE ~ QOF_19_data$ccg_code)) %>%
   subset(., select = -c(ccg_code))
 
-QOF_20 <- merge(QOF_19_to_20, Hyper19_20_grouped, by.x = "new_code", by.y = 'ccg_code', all = TRUE) 
+QOF_20 <- merge(QOF_19_to_20, hyper_prev_19_20, by.x = "new_code", by.y = 'ccg_code', all = TRUE) %>%
+  rename(ccg_code = new_code)
 
-QOF_cl <- QOF_20[-219,] # Clean and Finalised Dataset of 5 years of QOF Data
+QOF_20_data <- merge(QOF_20, ccg_2021_codes, by.x = 'ccg_code', by.y = 'old_code', all = TRUE)
 
-QOF_data <- QOF_cl %>% 
+QOF_20_to_21 <- QOF_20_data %>%
+  mutate(., new_code = case_when(ccg_code != QOF_20_data$new_code ~ QOF_20_data$new_code, 
+                                 TRUE ~ QOF_20_data$ccg_code)) %>%
+  subset(., select = -c(ccg_code))
+
+QOF_21 <- merge(QOF_20_to_21, hyper_prev_20_21, by.x = "new_code", by.y = 'ccg_code', all = TRUE)
+
+QOF_22 <- merge(QOF_21, ccg_agg, by.x = 'new_code', by.y = 'CCG21CDH', all = TRUE)
+
+QOF_prev <- QOF_22 %>%
+  rename(ccg_code = new_code) %>%
+  group_by(ccg_code) %>%
+  summarise(listsize_15 = sum(tot_list_size_14_15, na.rm = TRUE), 
+            register_15 = sum(tot_register_14_15, na.rm = TRUE), 
+            obsprev_15 = mean(avg_prevalence_14_15, na.rm = TRUE), 
+            expprev_15 = mean(exp_hyp_14_15, na.rm = TRUE),
+            agestdprev_15 = mean(age_std_prev_14_15, na.rm = TRUE),
+            obs_exp_ratio_15 = mean(obs_over_exp_15, na.rm = TRUE),
+            listsize_16 = sum(tot_list_size_15_16, na.rm = TRUE), 
+            register_16 = sum(tot_register_15_16, na.rm = TRUE), 
+            obsprev_16 = mean(avg_prevalence_15_16, na.rm = TRUE), 
+            expprev_16 = mean(exp_hyp_15_16, na.rm = TRUE),
+            agestdprev_16 = mean(age_std_prev_15_16, na.rm = TRUE),
+            obs_exp_ratio_16 = mean(obs_over_exp_16, na.rm = TRUE),
+            listsize_17 = sum(tot_list_size_16_17, na.rm = TRUE), 
+            register_17 = sum(tot_register_16_17, na.rm = TRUE), 
+            obsprev_17 = mean(avg_prevalence_16_17, na.rm = TRUE), 
+            expprev_17 = mean(exp_hyp_16_17, na.rm = TRUE),
+            agestdprev_17 = mean(age_std_prev_16_17, na.rm = TRUE),
+            obs_exp_ratio_17 = mean(obs_over_exp_17, na.rm = TRUE),
+            listsize_18 = sum(tot_list_size_17_18, na.rm = TRUE), 
+            register_18 = sum(tot_register_17_18, na.rm = TRUE), 
+            obsprev_18 = mean(avg_prevalence_17_18, na.rm = TRUE), 
+            expprev_18 = mean(exp_hyp_17_18, na.rm = TRUE),
+            agestdprev_18 = mean(age_std_prev_17_18, na.rm = TRUE),
+            obs_exp_ratio_18 = mean(obs_over_exp_18, na.rm = TRUE),
+            listsize_19 = sum(tot_list_size_18_19, na.rm = TRUE), 
+            register_19 = sum(tot_register_18_19, na.rm = TRUE), 
+            obsprev_19 = mean(avg_prevalence_18_19, na.rm = TRUE), 
+            expprev_19 = mean(exp_hyp_18_19, na.rm = TRUE),
+            agestdprev_19 = mean(age_std_prev_18_19, na.rm = TRUE),
+            obs_exp_ratio_19 = mean(obs_over_exp_19, na.rm = TRUE),
+            listsize_20 = sum(tot_list_size_19_20, na.rm = TRUE), 
+            register_20 = sum(tot_register_19_20, na.rm = TRUE), 
+            obsprev_20 = mean(avg_prevalence_19_20, na.rm = TRUE), 
+            expprev_20 = mean(exp_hyp_19_20, na.rm = TRUE),
+            agestdprev_20 = mean(age_std_prev_19_20, na.rm = TRUE),
+            obs_exp_ratio_20 = mean(obs_over_exp_20, na.rm = TRUE),
+            listsize_21 = sum(tot_list_size_20_21, na.rm = TRUE), 
+            register_21 = sum(tot_register_20_21, na.rm = TRUE), 
+            obsprev_21 = mean(avg_prevalence_20_21, na.rm = TRUE), 
+            expprev_21 = mean(exp_hyp_20_21, na.rm = TRUE), 
+            agestdprev_21 = mean(age_std_prev_20_21, na.rm = TRUE), 
+            obs_exp_ratio_21 = mean(obs_over_exp_21, na.rm = TRUE), 
+            listsize_22 = sum(tot_list_size_21_22, na.rm = TRUE), 
+            register_22 = sum(tot_register_21_22, na.rm = TRUE), 
+            obsprev_22 = mean(avg_prevalence_21_22, na.rm = TRUE), 
+            expprev_22 = mean(exp_hyp_21_22, na.rm = TRUE), 
+            agestdprev_22 = mean(age_std_prev_21_22, na.rm = TRUE), 
+            obs_exp_ratio_22 = mean(obs_over_exp_22, na.rm = TRUE))
+
+#### Interupted Time Series Analysis ####
+# Transforming the Data for ITS purposes 
+QOF_prev_long <- QOF_prev %>%
+  pivot_longer(!ccg_code,
+               names_to = c("category", "year"),
+               names_pattern = "([A-Za-z]+)_(\\d+)", # separates variables by characters and then numbers, similar to name_sep but more sophisticated
+               values_to = "score")
+
+# having pivoted the data long, then want to re-integrate the columns for each variable of interest
+QOF_prev_cl <- QOF_prev_long %>%
+  pivot_wider(names_from = "category", 
+              values_from = "score") %>%
+  rename(list_size = listsize, 
+         age_std_prevalence = agestdprev, 
+         exp_prevalence = expprev, 
+         obs_prevalence = obsprev) %>%
+  mutate_at('year', as.numeric) %>%
+  mutate(covid = case_when(year >= 21 ~ 1, T ~ 0), 
+         covid_yr = case_when(year==21 ~ 1, 
+                              year==22 ~ 2, T~0), 
+         threshold_change = case_when(year >= 20 ~ 1, T ~ 0), 
+         year = year - 15) # creating dummy variable for the covid years 
+
+# performing ITS 
+itsa <- lm(age_std_prevalence ~ year + threshold_change + covid + year*covid, data = QOF_prev_cl)
+summary(itsa)
+
+#### OLS ####
+# Only up to 2020 for OLS 
+QOF_data <- QOF_20 %>% 
   rename(ccg_code = new_code) %>%
   group_by(ccg_code) %>%
   summarise(tot_list_size_14_15 = sum(tot_list_size_14_15, na.rm = TRUE), 
             tot_register_14_15 = sum(tot_register_14_15, na.rm = TRUE), 
             avg_prevalence_14_15 = mean(avg_prevalence_14_15, na.rm = TRUE), 
+            avg_exp_prev_14_15 = mean(exp_hyp_14_15, na.rm = TRUE),
+            avg_age_std_prev_14_15 = mean(age_std_prev_14_15, na.rm = TRUE),
+            avg_obs_exp_ratio_14_15 = mean(obs_over_exp_15, na.rm = TRUE),
             tot_numerator_14_15 = sum(tot_numerator_14_15, na.rm = TRUE), 
             tot_denominator_14_15 = sum(tot_denominator_14_15, na.rm = TRUE),
             avg_achievement_14_15 = mean(avg_achievement_14_15, na.rm = TRUE), 
@@ -1236,6 +1663,9 @@ QOF_data <- QOF_cl %>%
             tot_list_size_15_16 = sum(tot_list_size_15_16, na.rm = TRUE), 
             tot_register_15_16 = sum(tot_register_15_16, na.rm = TRUE), 
             avg_prevalence_15_16 = mean(avg_prevalence_15_16, na.rm = TRUE), 
+            avg_exp_prev_15_16 = mean(exp_hyp_15_16, na.rm = TRUE),
+            avg_age_std_prev_15_16 = mean(age_std_prev_15_16, na.rm = TRUE),
+            avg_obs_exp_ratio_15_16 = mean(obs_over_exp_16, na.rm = TRUE),
             tot_numerator_15_16 = sum(tot_numerator_15_16, na.rm = TRUE), 
             tot_denominator_15_16 = sum(tot_denominator_15_16, na.rm = TRUE),
             avg_achievement_15_16 = mean(avg_achievement_15_16, na.rm = TRUE), 
@@ -1243,6 +1673,9 @@ QOF_data <- QOF_cl %>%
             tot_list_size_16_17 = sum(tot_list_size_16_17, na.rm = TRUE), 
             tot_register_16_17 = sum(tot_register_16_17, na.rm = TRUE), 
             avg_prevalence_16_17 = mean(avg_prevalence_16_17, na.rm = TRUE), 
+            avg_exp_prev_16_17 = mean(exp_hyp_16_17, na.rm = TRUE),
+            avg_age_std_prev_16_17 = mean(age_std_prev_16_17, na.rm = TRUE),
+            avg_obs_exp_ratio_16_17 = mean(obs_over_exp_17, na.rm = TRUE),
             tot_numerator_16_17 = sum(tot_numerator_16_17, na.rm = TRUE), 
             tot_denominator_16_17 = sum(tot_denominator_16_17, na.rm = TRUE),
             avg_achievement_16_17 = mean(avg_achievement_16_17, na.rm = TRUE), 
@@ -1250,6 +1683,9 @@ QOF_data <- QOF_cl %>%
             tot_list_size_17_18 = sum(tot_list_size_17_18, na.rm = TRUE), 
             tot_register_17_18 = sum(tot_register_17_18, na.rm = TRUE), 
             avg_prevalence_17_18 = mean(avg_prevalence_17_18, na.rm = TRUE), 
+            avg_exp_prev_17_18 = mean(exp_hyp_17_18, na.rm = TRUE),
+            avg_age_std_prev_17_18 = mean(age_std_prev_17_18, na.rm = TRUE),
+            avg_obs_exp_ratio_17_18 = mean(obs_over_exp_18, na.rm = TRUE),
             tot_numerator_17_18 = sum(tot_numerator_17_18, na.rm = TRUE), 
             tot_denominator_17_18 = sum(tot_denominator_17_18, na.rm = TRUE),
             avg_achievement_17_18 = mean(avg_achievement_17_18, na.rm = TRUE), 
@@ -1257,6 +1693,9 @@ QOF_data <- QOF_cl %>%
             tot_list_size_18_19 = sum(tot_list_size_18_19, na.rm = TRUE), 
             tot_register_18_19 = sum(tot_register_18_19, na.rm = TRUE), 
             avg_prevalence_18_19 = mean(avg_prevalence_18_19, na.rm = TRUE), 
+            avg_exp_prev_18_19 = mean(exp_hyp_18_19, na.rm = TRUE),
+            avg_age_std_prev_18_19 = mean(age_std_prev_18_19, na.rm = TRUE),
+            avg_obs_exp_ratio_18_19 = mean(obs_over_exp_19, na.rm = TRUE),
             tot_numerator_18_19 = sum(tot_numerator_18_19, na.rm = TRUE), 
             tot_denominator_18_19 = sum(tot_denominator_18_19, na.rm = TRUE),
             avg_achievement_18_19 = mean(avg_achievement_18_19, na.rm = TRUE), 
@@ -1264,6 +1703,9 @@ QOF_data <- QOF_cl %>%
             tot_list_size_19_20 = sum(tot_list_size_19_20, na.rm = TRUE), 
             tot_register_19_20 = sum(tot_register_19_20, na.rm = TRUE), 
             avg_prevalence_19_20 = mean(avg_prevalence_19_20, na.rm = TRUE), 
+            avg_exp_prev_19_20 = mean(exp_hyp_19_20, na.rm = TRUE),
+            avg_age_std_prev_19_20 = mean(age_std_prev_19_20, na.rm = TRUE),
+            avg_obs_exp_ratio_19_20 = mean(obs_over_exp_20, na.rm = TRUE),
             tot_u79_numerator_19_20 = sum(tot_u79_numerator_19_20, na.rm = TRUE), 
             tot_u79_denominator_19_20 = sum(tot_u79_denominator_19_20, na.rm = TRUE),
             avg_u79_achievement_19_20 = mean(avg_u79_achievement_19_20, na.rm = TRUE), 
