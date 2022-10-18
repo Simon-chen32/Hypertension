@@ -15,19 +15,14 @@ Eng_CCG <- st_read("~/Hypertension/CCG Geography/CCG_APR_2021_EN_BFC.shp")
 ENG_LSOA21 <- st_read("~/Hypertension/LSOA Shapefiles/LSOA_2021_EW_BFE_V5.shp")
 ENG_LSOA11 <- st_read("~/Hypertension/LSOA Shapefiles/infuse_lsoa_lyr_2011.shp") %>% 
   filter(str_detect(geo_code, '^E'))
-
-ENG_LAD17 <- st_read("~/Hypertension/2011 LAD Census Geography/Local_Authority_Districts_(December_2017)_Boundaries_in_the_UK_(WGS84).shp") %>%
-  filter(str_detect(lad17cd, '^E'))
-
 London_2011 <- st_read("~/Hypertension/LSOA Shapefiles/statistical-gis-boundaries-london/ESRI/LSOA_2011_London_gen_MHW.shp") %>%
   subset(., select = -c(RGN11CD:AVHHOLDSZ))
-London_LAD <- st_read("~/Hypertension/LSOA Shapefiles/statistical-gis-boundaries-london/ESRI/London_Borough_Excluding_MHW.shp") %>%
-  subset(., select = -c(ONS_INNER, SUB_2006, SUB_2009))
 
 # Loading in GP Data
 GP_age_dist <- read_csv("~/Hypertension/GP Data/PopulationAgeDistribution.csv") %>%
   clean_names()
 
+#### Age Standardisation ####
 GP_age_dist_wide <- GP_age_dist %>% 
   pivot_wider(names_from = c(age, sex), 
               values_from = value) %>%
@@ -211,6 +206,7 @@ ccg_grouped <- merge(lsoa_age_adj, lsoa_ccg_la, by.x = 'lsoa_code', by.y = 'LSOA
 mean(lsoa_grouped$obs_hyper_prev) # 14.31%
 median(lsoa_grouped$obs_hyper_prev) #14.57%
 
+#### Plotting ####
 # Creating a Shapefile to plot prevalence by LSOA
 hyper_prev_shp <- merge(ENG_LSOA11, lsoa_age_adj, by.x = 'geo_code', by.y = 'lsoa_code')
 
@@ -250,9 +246,14 @@ ccg_agg <- ccg_grouped %>%
             avg_o80_intervention_21_22 = mean(o80_intervention))
 
 ccg_agg_shp <- merge(Eng_CCG, ccg_agg, by = c('CCG21CD', 'CCG21NM'))
-ccg_agg_region <- merge(ccg_agg_shp, ccg_region)
+ccg_agg_region <- merge(ccg_agg_shp, ccg_region) 
+
+top10_ccg <- ccg_agg_region %>%
+  arrange(desc(age_std_prev_21_22)) %>%
+  slice(1:11)
   
 # Subsetting CCGs by Region
+# Obtaining the Region Boundaries
 midlands_ccg <- subset(ccg_shp, NHSER21NM == 'Midlands')
 north_east_ccg <- subset(ccg_shp, NHSER21NM == 'North East and Yorkshire')
 north_west_ccg <- subset(ccg_shp, NHSER21NM == 'North West')
@@ -263,13 +264,27 @@ east_eng_ccg <- subset(ccg_shp, NHSER21NM == 'East of England')
 
 ccg_hyper <- merge(ccg_shp, ccg_grouped, by = c('CCG21CD', 'CCG21NM', 'CCG21CDH'))
 
-midlands_ccg_hyper <- subset(shp_df, NHSER21NM == 'Midlands')
-north_east_ccg_hyper <- subset(shp_df, NHSER21NM == 'North East and Yorkshire')
-north_west_ccg_hyper <- subset(shp_df, NHSER21NM == 'North West')
-london_ccg_hyper <- merge(London_2011, ccg_grouped, by.x = 'LSOA11CD', by.y = 'lsoa_code')
-south_east_ccg_hyper <- subset(shp_df, NHSER21NM == 'South East')
-south_west_ccg_hyper <- subset(shp_df, NHSER21NM == 'South West')
-east_eng_ccg_hyper <- subset(shp_df, NHSER21NM == 'East of England')
+# Obtaining LSOA boundaries within Regions
+midlands_ccg_hyper <- subset(shp_df, NHSER21NM == 'Midlands') %>%
+  subset(., select = -c(geo_labelw, label, name, LAD21CD, LAD21NM)) %>%
+  rename(lsoa_code = geo_code)
+north_east_ccg_hyper <- subset(shp_df, NHSER21NM == 'North East and Yorkshire')%>%
+  subset(., select = -c(geo_labelw, label, name, LAD21CD, LAD21NM)) %>%
+  rename(lsoa_code = geo_code)
+north_west_ccg_hyper <- subset(shp_df, NHSER21NM == 'North West')%>%
+  subset(., select = -c(geo_labelw, label, name, LAD21CD, LAD21NM)) %>%
+  rename(lsoa_code = geo_code)
+london_ccg_hyper <- merge(London_2011, ccg_grouped, by.x = 'LSOA11CD', by.y = 'lsoa_code') %>%
+  subset(., select = -c(LAD11CD, LAD11NM, FID, LSOA11NM.y, LAD21CD, LAD21NM)) 
+south_east_ccg_hyper <- subset(shp_df, NHSER21NM == 'South East') %>%
+  subset(., select = -c(geo_labelw, label, name, LAD21CD, LAD21NM)) %>%
+  rename(lsoa_code = geo_code)
+south_west_ccg_hyper <- subset(shp_df, NHSER21NM == 'South West') %>%
+  subset(., select = -c(geo_labelw, label, name, LAD21CD, LAD21NM)) %>%
+  rename(lsoa_code = geo_code)
+east_eng_ccg_hyper <- subset(shp_df, NHSER21NM == 'East of England') %>%
+  subset(., select = -c(geo_labelw, label, name, LAD21CD, LAD21NM)) %>%
+  rename(lsoa_code = geo_code)
 
 # Looking at Age standardised Prevalence
 ggplot(ccg_hyper) + 
@@ -360,6 +375,16 @@ tm_shape(midlands_ccg_hyper) +
 tm_shape(midlands_ccg) +
   tm_borders()
 
+tm_shape(midlands_ccg_hyper) +
+  tm_fill(col = 'obs_over_exp', title = "Obs:Exp Ratio", 
+          legend.hist = TRUE, palette = "-RdBu",
+          breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
+          labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in the Midlands', legend.outside = TRUE) +
+  tm_shape(midlands_ccg) +
+  tm_borders('black', lwd = 1)
+
 
 # North East and Yorkshire
 ggplot(north_east_hyper) + 
@@ -377,6 +402,16 @@ tm_shape(north_east_ccg_hyper) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in NE England', legend.outside = TRUE) +
 tm_shape(north_east_ccg) +
+  tm_borders('black', lwd = 1)
+
+tm_shape(north_east_ccg_hyper) +
+  tm_fill(col = 'obs_over_exp', title = "Obs:Exp Ratio", 
+          legend.hist = TRUE, palette = "-RdBu",
+          breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
+          labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in NE England', legend.outside = TRUE) +
+  tm_shape(north_east_ccg) +
   tm_borders('black', lwd = 1)
 
 # NW England
@@ -403,8 +438,7 @@ nw_ratio <- tm_shape(north_west_ccg_hyper) +
           breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
           labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
-  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in NW England', legend.outside = TRUE,
-            ) +
+  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in NW England', legend.outside = TRUE) +
   tm_shape(north_west_ccg) +
   tm_borders('black', lwd = 1)
 
@@ -426,15 +460,15 @@ tm_shape(london_hyper) +
 tm_shape(london_ccg) +
   tm_borders('black', lwd = 1)
 
-london_ccg_hyper_agg <- subset(ccg_agg_region, NHSER21NM == 'London')
-tm_shape(london_ccg_hyper_agg) +
-  tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
-          legend.hist = TRUE, palette = "Blues") +
+tm_shape(london_ccg_hyper) +
+  tm_fill(col = 'obs_over_exp', title = "Obs:Exp Ratio", 
+          legend.hist = TRUE, palette = "-RdBu",
+          breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
+          labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
-  tm_layout(main.title = 'Hypertension Prevalence by CCG', legend.outside = TRUE) +
-tm_shape(london_ccg) +
+  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in London', legend.outside = TRUE) +
+  tm_shape(london_ccg) +
   tm_borders('black', lwd = 1)
-
 
 # SE England
 ggplot(south_east_hyper) + 
@@ -452,6 +486,16 @@ tm_shape(south_east_ccg_hyper) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in SE England', legend.outside = TRUE) +
 tm_shape(south_east_ccg) +
+  tm_borders('black', lwd = 1)
+
+tm_shape(south_east_ccg_hyper) +
+  tm_fill(col = 'obs_over_exp', title = "Obs:Exp Ratio", 
+          legend.hist = TRUE, palette = "-RdBu",
+          breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
+          labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in SE England', legend.outside = TRUE) +
+  tm_shape(south_east_ccg) +
   tm_borders('black', lwd = 1)
 
 # SW England
@@ -472,6 +516,16 @@ tm_shape(south_west_ccg_hyper) +
 tm_shape(south_west_ccg) +
   tm_borders('black', lwd = 1)
 
+tm_shape(south_west_ccg_hyper) +
+  tm_fill(col = 'obs_over_exp', title = "Obs:Exp Ratio", 
+          legend.hist = TRUE, palette = "-RdBu",
+          breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
+          labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in SW England', legend.outside = TRUE) +
+  tm_shape(south_west_ccg) +
+  tm_borders('black', lwd = 1)
+
 # East England
 ggplot(east_eng_hyper) + 
   aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
@@ -490,8 +544,21 @@ tm_shape(east_eng_ccg_hyper) +
 tm_shape(east_eng_ccg) +
   tm_borders('black', lwd = 1)
 
+tm_shape(east_eng_ccg_hyper) +
+  tm_fill(col = 'obs_over_exp', title = "Obs:Exp Ratio", 
+          legend.hist = TRUE, palette = "-RdBu",
+          breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
+          labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in East England', legend.outside = TRUE) +
+  tm_shape(east_eng_ccg) +
+  tm_borders('black', lwd = 1) 
+
 #### Deprivation Analysis ####
 lsoa_hyper_imd <- merge(lsoa_age_adj, LSOA_imd_cl, by.x = 'lsoa_code', by.y = 'lsoa_code_2011')
+
+# Finding National Average IMD Score
+mean(lsoa_hyper_imd$imd_score) # 21.67
 
 # Investigating the relationship between IMD and Hypertension Prevalence 
 # Investigate by Region 
@@ -527,17 +594,310 @@ ggplot(lsoa_hyper_imd, aes(x = imd_score, y = age_std_prev)) +
   stat_smooth(method = 'lm', col = 'red', size = 1) + 
   labs(x = "IMD Score", y = "Age Standardised Prevalence Rate")
 
-# London Specific 
-ggplot(london_ccg_hyper) + 
-  aes(x = age_std_prev, color = CCG21NM, fill = CCG21NM) + 
-  geom_density(alpha = 0.25)
+# Comparing the ratio to IMD
+ggplot(lsoa_hyper_imd, aes(x = imd_score, y = obs_over_exp)) + 
+  geom_point(aes(color = imd_decile)) + 
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Reported Prevalence to Expected")
+
+# Breaking down the relationship by Region 
+## Midlands ##
+midlands_imd <- merge(midlands_ccg_hyper, LSOA_imd_cl, by.x = "lsoa_code", by.y = "lsoa_code_2011")
+# Age Adjusted Relationship 
+ggplot(midlands_imd, aes(x = imd_score, y = age_std_prev)) + 
+  geom_point(aes(color = imd_decile)) +
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Age Standardised Prevalence Rate")
+# Ratio
+ggplot(midlands_imd, aes(x = imd_score, y = obs_over_exp)) + 
+  geom_point(aes(color = imd_decile)) + 
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Reported Prevalence to Expected")
+
+# Try and break down CCG by MSOA/LSOA
+#### Including LSOA to MSOA Lookup file for Plotting Distribution of Prevalence ####
+lsoa_msoa <- read_csv("Output_Area_to_LSOA_to_MSOA_to_Local_Authority_District_(December_2017)_Lookup.csv") %>%
+  select(LSOA11CD, MSOA11CD, MSOA11NM)
+
+# Selecting Stoke on Trent
+stoke_on_trent_hyp <- subset(midlands_imd, CCG21CD == 'E38000175')
+# Finding the Mean IMD Score in Stoke-on-Trent
+mean(stoke_on_trent_hyp$imd_score) # 33.31
+# Aggregating at MSOA for plotting purposes
+stoke_msoa <- merge(stoke_on_trent_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
+  group_by(MSOA11CD, MSOA11NM) %>%
+  summarise(age_std_prev = mean(age_std_prev), 
+            obs_over_exp = mean(obs_over_exp), 
+            imd_score = mean(imd_score), 
+            income_score = mean(income_score_rate), 
+            employment_score = mean(employment_score_rate), 
+            education_training_score = mean(education_skills_and_training_score), 
+            health_disability_score = mean(health_deprivation_and_disability_score),
+            crime_score = mean(crime_score), 
+            living_env_score = mean(living_environment_score), 
+            housing_score = mean(barriers_to_housing_and_services_score))
+
+# Selecting North Staffordshire
+north_staffordshire_hyp <- subset(midlands_imd, CCG21CD == 'E38000126')
+# Finding the Mean IMD Score 
+mean(north_staffordshire_hyp$imd_score) # 17.78
+# Aggregating at MSOA for plotting purposes
+north_staffordshire_msoa <- merge(north_staffordshire_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
+  group_by(MSOA11CD, MSOA11NM) %>%
+  summarise(age_std_prev = mean(age_std_prev), 
+            obs_over_exp = mean(obs_over_exp), 
+            imd_score = mean(imd_score), 
+            income_score = mean(income_score_rate), 
+            employment_score = mean(employment_score_rate), 
+            education_training_score = mean(education_skills_and_training_score), 
+            health_disability_score = mean(health_deprivation_and_disability_score),
+            crime_score = mean(crime_score), 
+            living_env_score = mean(living_environment_score), 
+            housing_score = mean(barriers_to_housing_and_services_score))
+
+## North-East England ##
+north_east_imd <- merge(north_east_ccg_hyper, LSOA_imd_cl, by.x = "lsoa_code", by.y = "lsoa_code_2011")
+ggplot(north_east_imd, aes(x = imd_score, y = age_std_prev)) + 
+  geom_point(aes(color = imd_decile)) +
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Age Standardised Prevalence Rate")
+
+ggplot(north_east_imd, aes(x = imd_score, y = obs_over_exp)) + 
+  geom_point(aes(color = imd_decile)) + 
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Reported Prevalence to Expected")
+
+# Try and break down CCG by MSOA/LSOA
+# County Durham 
+county_durham_hyp <- subset(north_east_imd, CCG21CD == 'E38000234')
+# Finding the Mean IMD Score 
+mean(county_durham_hyp$imd_score) # 27.43
+# Aggregating at MSOA for plotting purposes
+county_durham_msoa <- merge(county_durham_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
+  group_by(MSOA11CD, MSOA11NM) %>%
+  summarise(age_std_prev = mean(age_std_prev), 
+            obs_over_exp = mean(obs_over_exp), 
+            imd_score = mean(imd_score), 
+            income_score = mean(income_score_rate), 
+            employment_score = mean(employment_score_rate), 
+            education_training_score = mean(education_skills_and_training_score), 
+            health_disability_score = mean(health_deprivation_and_disability_score),
+            crime_score = mean(crime_score), 
+            living_env_score = mean(living_environment_score), 
+            housing_score = mean(barriers_to_housing_and_services_score))
+
+# Sunderland
+sunderland_hyp <- subset(north_east_imd, CCG21CD == 'E38000176')
+# Finding the Mean IMD Score
+mean(sunderland_hyp$imd_score) # 30.64
+# Aggregating at MSOA for plotting purposes
+sunderland_msoa <- merge(sunderland_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
+  group_by(MSOA11CD, MSOA11NM) %>%
+  summarise(age_std_prev = mean(age_std_prev), 
+            obs_over_exp = mean(obs_over_exp), 
+            imd_score = mean(imd_score), 
+            income_score = mean(income_score_rate), 
+            employment_score = mean(employment_score_rate), 
+            education_training_score = mean(education_skills_and_training_score), 
+            health_disability_score = mean(health_deprivation_and_disability_score),
+            crime_score = mean(crime_score), 
+            living_env_score = mean(living_environment_score), 
+            housing_score = mean(barriers_to_housing_and_services_score))
+
+# East Riding of Yorkshire
+east_riding_yorkshire_hyp <- subset(north_east_imd, CCG21CD == 'E38000052')
+# Finding the Mean IMD Score 
+mean(east_riding_yorkshire_hyp$imd_score) # 16.27
+# Aggregating at MSOA for plotting purposes
+east_yorkshire_msoa <- merge(east_riding_yorkshire_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
+  group_by(MSOA11CD, MSOA11NM) %>%
+  summarise(age_std_prev = mean(age_std_prev), 
+            obs_over_exp = mean(obs_over_exp), 
+            imd_score = mean(imd_score), 
+            income_score = mean(income_score_rate), 
+            employment_score = mean(employment_score_rate), 
+            education_training_score = mean(education_skills_and_training_score), 
+            health_disability_score = mean(health_deprivation_and_disability_score),
+            crime_score = mean(crime_score), 
+            living_env_score = mean(living_environment_score), 
+            housing_score = mean(barriers_to_housing_and_services_score))
+
+# North Lincolnshire
+north_lincolnshire_hyp <- subset(north_east_imd, CCG21CD == 'E38000122')
+# Finding the Mean IMD Score 
+mean(north_lincolnshire_hyp$imd_score) # 21.93
+# Aggregating at MSOA for plotting purposes
+north_lincolnshire_msoa <- merge(north_lincolnshire_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
+  group_by(MSOA11CD, MSOA11NM) %>%
+  summarise(age_std_prev = mean(age_std_prev), 
+            obs_over_exp = mean(obs_over_exp), 
+            imd_score = mean(imd_score), 
+            income_score = mean(income_score_rate), 
+            employment_score = mean(employment_score_rate), 
+            education_training_score = mean(education_skills_and_training_score), 
+            health_disability_score = mean(health_deprivation_and_disability_score),
+            crime_score = mean(crime_score), 
+            living_env_score = mean(living_environment_score), 
+            housing_score = mean(barriers_to_housing_and_services_score))
+
+
+## North-West England ##
+north_west_imd <- merge(north_west_ccg_hyper, LSOA_imd_cl, by.x = "lsoa_code", by.y = "lsoa_code_2011")
+ggplot(north_west_imd, aes(x = imd_score, y = age_std_prev)) + 
+  geom_point(aes(color = imd_decile)) +
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Age Standardised Prevalence Rate")
+
+ggplot(north_west_imd, aes(x = imd_score, y = obs_over_exp)) + 
+  geom_point(aes(color = imd_decile)) + 
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Reported Prevalence to Expected")
+
+# Try and break down CCG by MSOA/LSOA
+# Blackpool
+blackpool_hyp <- subset(north_west_imd, CCG21CD == 'E38000015')
+# Finding the Mean IMD Score 
+mean(blackpool_hyp$imd_score) # 19.48
+# Aggregating at MSOA for plotting purposes
+blackpool_msoa <- merge(blackpool_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
+  group_by(MSOA11CD, MSOA11NM) %>%
+  summarise(age_std_prev = mean(age_std_prev), 
+            obs_over_exp = mean(obs_over_exp), 
+            imd_score = mean(imd_score), 
+            income_score = mean(income_score_rate), 
+            employment_score = mean(employment_score_rate), 
+            education_training_score = mean(education_skills_and_training_score), 
+            health_disability_score = mean(health_deprivation_and_disability_score),
+            crime_score = mean(crime_score), 
+            living_env_score = mean(living_environment_score), 
+            housing_score = mean(barriers_to_housing_and_services_score))
+
+# Fylde and Wyre
+fylde_and_wyre_hyp <- subset(north_west_imd, CCG21CD == 'E38000226')
+# Finding the Mean IMD Score 
+mean(fylde_and_wyre_hyp$imd_score) # 45.91
+# Aggregating at MSOA for plotting purposes
+fylde_and_wyre_msoa <- merge(fylde_and_wyre_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
+  group_by(MSOA11CD, MSOA11NM) %>%
+  summarise(age_std_prev = mean(age_std_prev), 
+            obs_over_exp = mean(obs_over_exp), 
+            imd_score = mean(imd_score), 
+            income_score = mean(income_score_rate), 
+            employment_score = mean(employment_score_rate), 
+            education_training_score = mean(education_skills_and_training_score), 
+            health_disability_score = mean(health_deprivation_and_disability_score),
+            crime_score = mean(crime_score), 
+            living_env_score = mean(living_environment_score), 
+            housing_score = mean(barriers_to_housing_and_services_score))
+
+# St Helens
+st_helens_hyp <- subset(north_west_imd, CCG21CD == 'E38000172')
+# Finding the Mean IMD Score 
+mean(st_helens_hyp$imd_score) # 31.51
+# Aggregating at MSOA for plotting purposes
+st_helens_msoa <- merge(st_helens_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
+  group_by(MSOA11CD, MSOA11NM) %>%
+  summarise(age_std_prev = mean(age_std_prev), 
+            obs_over_exp = mean(obs_over_exp), 
+            imd_score = mean(imd_score), 
+            income_score = mean(income_score_rate), 
+            employment_score = mean(employment_score_rate), 
+            education_training_score = mean(education_skills_and_training_score), 
+            health_disability_score = mean(health_deprivation_and_disability_score),
+            crime_score = mean(crime_score), 
+            living_env_score = mean(living_environment_score), 
+            housing_score = mean(barriers_to_housing_and_services_score))
+
+# Tameside and Glossop
+tameside_and_glossop_hyp <- subset(north_west_imd, CCG21CD == 'E38000182')
+# Finding the Mean IMD Score 
+mean(tameside_and_glossop_hyp$imd_score) # 29.12
+# Aggregating at MSOA for plotting purposes
+tameside_and_glossop_msoa <- merge(tameside_and_glossop_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
+  group_by(MSOA11CD, MSOA11NM) %>%
+  summarise(age_std_prev = mean(age_std_prev), 
+            obs_over_exp = mean(obs_over_exp), 
+            imd_score = mean(imd_score), 
+            income_score = mean(income_score_rate), 
+            employment_score = mean(employment_score_rate), 
+            education_training_score = mean(education_skills_and_training_score), 
+            health_disability_score = mean(health_deprivation_and_disability_score),
+            crime_score = mean(crime_score), 
+            living_env_score = mean(living_environment_score), 
+            housing_score = mean(barriers_to_housing_and_services_score))
+
+# Halton
+halton_hyp <- subset(north_west_imd, CCG21CD == 'E38000068')
+# Finding the Mean IMD Score
+mean(halton_hyp$imd_score) # 32.88
+# Aggregating at MSOA for plotting purposes
+halton_msoa <- merge(halton_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
+  group_by(MSOA11CD, MSOA11NM) %>%
+  summarise(age_std_prev = mean(age_std_prev), 
+            obs_over_exp = mean(obs_over_exp), 
+            imd_score = mean(imd_score), 
+            income_score = mean(income_score_rate), 
+            employment_score = mean(employment_score_rate), 
+            education_training_score = mean(education_skills_and_training_score), 
+            health_disability_score = mean(health_deprivation_and_disability_score),
+            crime_score = mean(crime_score), 
+            living_env_score = mean(living_environment_score), 
+            housing_score = mean(barriers_to_housing_and_services_score))
+
+
+## South-East England ## 
+south_east_imd <-  merge(south_east_ccg_hyper, LSOA_imd_cl, by.x = "lsoa_code", by.y = "lsoa_code_2011")
+ggplot(south_east_imd, aes(x = imd_score, y = age_std_prev)) + 
+  geom_point(aes(color = imd_decile)) +
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Age Standardised Prevalence Rate")
+
+ggplot(south_east_imd, aes(x = imd_score, y = obs_over_exp)) + 
+  geom_point(aes(color = imd_decile)) + 
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Reported Prevalence to Expected")
+
+## South-West England0 ## 
+south_west_imd <- merge(south_west_ccg_hyper, LSOA_imd_cl, by.x = "lsoa_code", by.y = "lsoa_code_2011")
+ggplot(south_west_imd, aes(x = imd_score, y = age_std_prev)) + 
+  geom_point(aes(color = imd_decile)) +
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Age Standardised Prevalence Rate")
+
+ggplot(south_west_imd, aes(x = imd_score, y = obs_over_exp)) + 
+  geom_point(aes(color = imd_decile)) + 
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Reported Prevalence to Expected")
+
+## East England ##
+east_imd <- merge(east_eng_ccg_hyper, LSOA_imd_cl, by.x = "lsoa_code", by.y = "lsoa_code_2011")
+ggplot(east_imd, aes(x = imd_score, y = age_std_prev)) + 
+  geom_point(aes(color = imd_decile)) +
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Age Standardised Prevalence Rate")
+
+ggplot(east_imd, aes(x = imd_score, y = obs_over_exp)) + 
+  geom_point(aes(color = imd_decile)) + 
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Reported Prevalence to Expected")
+
+## London ## 
+london_imd <- merge(london_ccg_hyper, LSOA_imd_cl, by.x = "LSOA11CD", by.y = "lsoa_code_2011")
+ggplot(london_imd, aes(x = imd_score, y = age_std_prev)) + 
+  geom_point(aes(color = imd_decile)) +
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Age Standardised Prevalence Rate")
+
+ggplot(london_imd, aes(x = imd_score, y = obs_over_exp)) + 
+  geom_point(aes(color = imd_decile)) + 
+  stat_smooth(method = 'lm', col = 'red', size = 1) + 
+  labs(x = "IMD Score", y = "Reported Prevalence to Expected")
 
 # Create a second set Shapefile for Deprivation Prevalence 
 lsoa_ccg_region <- merge(lsoa_ccg_shp, ccg_region, by = c('CCG21CD', 'CCG21NM', 'CCG21CDH'))
 
 ne_imd <- subset(lsoa_ccg_region, NHSER21NM == 'North East and Yorkshire')
 nw_imd <- subset(lsoa_ccg_region, NHSER21NM == 'North West')
-
 
 imd_shp <- merge(ENG_LSOA11, LSOA_imd, by.x = 'geo_code', by.y = 'lsoa_code_2011') 
 
@@ -558,6 +918,28 @@ northwest_imd <- tm_shape(nw_imd_shp) +
   tm_borders('black', lwd = 1)
 
 tmap_arrange(nw_age_std_hyp, nw_ratio, northwest_imd)
+
+#### Objective 2 ####
+# Comparing QOF Prevalence to HSE Prevalence by GP 
+# Loading in HSE GP Prevalence data 
+hse_hyp_prev <- read_csv("hypertension_prevalence_estimate_HSE.csv") %>%
+  clean_names()
+
+# Age Standardising HSE data 
+hse_hyper_prev <- merge(GP_age_dist_cl, hse_hyp_prev, by.x = 'area_code', by.y = 'code') %>%
+  # Create new column for the percentage of patients a GP serves in each LSOA 
+  mutate(hse_exp_hyp = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100)
+
+# merging to QOF data from 21/22
+hse_qof_comp <- merge(hse_hyp_prev, Hyper21_22, by.x = 'code', by.y = 'practice_code')
+
+# finding difference in crude prevalence 
+undiagnosed_hyp_prev <- hse_qof_comp %>%
+  mutate(undiagnosed_hyp = percent - prevalence_percent_21_22) %>%
+  select(code, practice_name, percent, prevalence_percent_21_22, sub_icb_loc_ods_code, sub_icb_loc_ons_code, 
+         sub_icb_loc_name, undiagnosed_hyp) %>%
+  rename(hse_prevalence = percent, 
+         practice_code = code)
 
 #### Objective 3 ####
 #### Loading in QOF data from 2014-15 to 2019-20 ####
@@ -610,7 +992,7 @@ age_dist_15_cl <- age_dist_15 %>%
          female65_74, female75plus)
 
 # Converting raw totals into percentages
-ccg_age_dist_15 <- ccg_age_dist_15 %>%
+ccg_age_dist_15 <- age_dist_15_cl %>%
   mutate(male0_15_perc = male0_15/total_male, 
          male16_24_perc = male16_24/total_male, 
          male25_34_perc = male25_34/total_male, 
@@ -1227,7 +1609,10 @@ Hyper19_20 <- read_csv("~/Hypertension/QOF Data/QOF_Hypertension_19-20.csv", ski
          over80_achievement_net_exceptions_19_20 = net_of_pc_as_percent_42,
          over80_percent_receiving_intervention_19_20 = intervention_percent_46) %>%
   subset(., under79_denominator_19_20 != 0) %>%
-  subset(., over80_denominator_19_20 != 0)
+  subset(., over80_denominator_19_20 != 0) %>%
+  # Changing the reported prevalence rate for this GP to the previous year due to misreporting of prevalence rates due 
+  # to GP merger/closure
+  mutate(prevalence_percent_19_20=ifelse(practice_code=="Y03051",8.67,prevalence_percent_19_20))
 
 Hyper19_20$under79_achievement_net_exceptions_19_20 <- as.numeric(Hyper19_20$under79_achievement_net_exceptions_19_20)
 Hyper19_20$under79_percent_receiving_intervention_19_20 <- as.numeric(Hyper19_20$under79_percent_receiving_intervention_19_20)
@@ -1568,7 +1953,7 @@ QOF_22 <- merge(QOF_21, ccg_agg, by.x = 'new_code', by.y = 'CCG21CDH', all = TRU
 
 QOF_prev <- QOF_22 %>%
   rename(ccg_code = new_code) %>%
-  group_by(ccg_code) %>%
+  group_by(CCG21CD) %>%
   summarise(listsize_15 = sum(tot_list_size_14_15, na.rm = TRUE), 
             register_15 = sum(tot_register_14_15, na.rm = TRUE), 
             obsprev_15 = mean(avg_prevalence_14_15, na.rm = TRUE), 
@@ -1621,7 +2006,7 @@ QOF_prev <- QOF_22 %>%
 #### Interupted Time Series Analysis ####
 # Transforming the Data for ITS purposes 
 QOF_prev_long <- QOF_prev %>%
-  pivot_longer(!ccg_code,
+  pivot_longer(!CCG21CD,
                names_to = c("category", "year"),
                names_pattern = "([A-Za-z]+)_(\\d+)", # separates variables by characters and then numbers, similar to name_sep but more sophisticated
                values_to = "score")
@@ -1635,15 +2020,49 @@ QOF_prev_cl <- QOF_prev_long %>%
          exp_prevalence = expprev, 
          obs_prevalence = obsprev) %>%
   mutate_at('year', as.numeric) %>%
-  mutate(covid = case_when(year >= 21 ~ 1, T ~ 0), 
-         covid_yr = case_when(year==21 ~ 1, 
-                              year==22 ~ 2, T~0), 
-         threshold_change = case_when(year >= 20 ~ 1, T ~ 0), 
+  mutate(threshold_change = case_when(year >= 20 ~ 1, T ~ 0), 
          year = year - 15) # creating dummy variable for the covid years 
 
+# Subsetting for the First Four Years
+QOF_prev_14_18 <- QOF_prev_cl %>%
+  filter(., year <=  4)
+
 # performing ITS 
-itsa <- lm(age_std_prevalence ~ year + threshold_change + covid + year*covid, data = QOF_prev_cl)
+itsa <- lm(age_std_prevalence ~ year + threshold_change, data = QOF_prev_cl)
 summary(itsa)
+
+# Finding what the average yearly increase in prevalence is from 2014-15 to 2017-18 
+fit_14_18 <- lm(age_std_prevalence ~ year, data = QOF_prev_14_18)
+summary(fit_14_18)
+
+# Fitting the yearly increase (0.11226) to the 2019 data to account for the change in prevalence 
+QOF_prev_19_22 <- QOF_prev %>%
+  select(CCG21CD, agestdprev_20, agestdprev_21, agestdprev_22)
+
+# Calculating the expected prevalence 
+QOF_prev_19_22 <- QOF_prev_19_22 %>%
+  mutate(exp_age_std_prev_21 = agestdprev_20 + 0.11226, 
+         exp_age_std_prev_22 = agestdprev_20 + 0.11226*2, 
+         # Now calculating the difference between the expected change and obs change to get the covid effect
+         age_std_prev_diff_21 = agestdprev_21 - exp_age_std_prev_21, 
+         age_std_prev_diff_22 = agestdprev_22 - exp_age_std_prev_22) 
+
+# plotting differences
+prev_diff_shp <- merge(Eng_CCG, QOF_prev_19_22, by = 'CCG21CD')
+
+# 2021 difference
+tm_shape(prev_diff_shp) + 
+  tm_polygons(col = 'age_std_prev_diff_21', border.alpha = 0.5, title = "Unreported Hypertension %", 
+              legend.hist = TRUE, palette = "RdBu") +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
+  tm_layout(main.title = 'Unreported Hypertension in the UK (2021)', legend.outside = TRUE) 
+
+# 2022 difference
+tm_shape(prev_diff_shp) + 
+  tm_polygons(col = 'age_std_prev_diff_22', border.alpha = 0.5, title = "Unreported Hypertension %", 
+              legend.hist = TRUE, palette = "RdBu") +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
+  tm_layout(main.title = 'Unreported Hypertension in the UK (2022)', legend.outside = TRUE) 
 
 #### OLS ####
 # Only up to 2020 for OLS 
