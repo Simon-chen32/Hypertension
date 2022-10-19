@@ -8,6 +8,7 @@ library(janitor)
 library(sf)
 library(stringr)
 library(ggplot2)
+library(RColorBrewer)
 
 #### Loading Data #####
 # Loading in Shapefile
@@ -211,6 +212,14 @@ median(lsoa_grouped$obs_hyper_prev) #14.57%
 hyper_prev_shp <- merge(ENG_LSOA11, lsoa_age_adj, by.x = 'geo_code', by.y = 'lsoa_code')
 
 tm_shape(hyper_prev_shp) + 
+  tm_polygons(col = 'age_std_prev', border.alpha = 0.5, title = "Age Std. Prev.", 
+              legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
+              lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) + 
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_layout(main.title = "Age Standardised Hypertension Prevalence Rate", legend.outside = TRUE)
+
+tm_shape(hyper_prev_shp) + 
   tm_polygons(col = 'obs_over_exp', border.alpha = 0.5, title = "Observed/Expected Ratio", 
               legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
               labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
@@ -369,8 +378,9 @@ ggplot(midlands_ccg_hyper) +
 
 tm_shape(midlands_ccg_hyper) +
   tm_fill(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
-              legend.hist = TRUE, palette = "Blues") +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+              legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
+          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence by CCG', legend.outside = TRUE) +
 tm_shape(midlands_ccg) +
   tm_borders()
@@ -398,7 +408,8 @@ ggplot(north_east_hyper) +
 
 tm_shape(north_east_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
-          legend.hist = TRUE, palette = "-RdBu") +
+          legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
+          lables = c("0-5%", "5-10%", "10-15%", "15-20%", "20-25%", "25-30%", "30-35%", "35%+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in NE England', legend.outside = TRUE) +
 tm_shape(north_east_ccg) +
@@ -424,9 +435,10 @@ ggplot(north_west_hyper) +
   labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
        title = "Standardised Hypertension Prevalence by CCG")
 
-nw_age_std_hyp <- tm_shape(north_west_ccg_hyper) +
+tm_shape(north_west_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
-          legend.hist = TRUE, palette = "-RdBu") +
+          legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
+          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in NW England', legend.outside = TRUE) +
 tm_shape(north_west_ccg) +
@@ -454,7 +466,8 @@ ggplot(london_ccg_hyper) +
 
 tm_shape(london_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
-              legend.hist = TRUE, palette = "-RdBu") +
+              legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
+          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence by CCG', legend.outside = TRUE) +
 tm_shape(london_ccg) +
@@ -482,7 +495,8 @@ ggplot(south_east_hyper) +
 
 tm_shape(south_east_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
-          legend.hist = TRUE, palette = "-RdBu") +
+          legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
+          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in SE England', legend.outside = TRUE) +
 tm_shape(south_east_ccg) +
@@ -510,7 +524,8 @@ ggplot(south_west_hyper) +
 
 tm_shape(south_west_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
-          legend.hist = TRUE, palette = "-RdBu") +
+          legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
+          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in SW England', legend.outside = TRUE) +
 tm_shape(south_west_ccg) +
@@ -538,7 +553,8 @@ ggplot(east_eng_hyper) +
 
 tm_shape(east_eng_ccg_hyper) +
   tm_fill(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
-              legend.hist = TRUE, palette = "-RdBu") +
+              legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
+          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in East England', legend.outside = TRUE) +
 tm_shape(east_eng_ccg) +
@@ -559,6 +575,21 @@ lsoa_hyper_imd <- merge(lsoa_age_adj, LSOA_imd_cl, by.x = 'lsoa_code', by.y = 'l
 
 # Finding National Average IMD Score
 mean(lsoa_hyper_imd$imd_score) # 21.67
+
+# Aggregating IMD at CCG 
+ccg_imd <- merge(ccg_hyper, LSOA_imd_cl, by.x = 'lsoa_code', by.y = 'lsoa_code_2011') %>%
+  group_by(CCG21CD, CCG21NM) %>%
+  summarise(imd_score = mean(imd_score), 
+            income_score = mean(income_score_rate), 
+            employment_score = mean(employment_score_rate), 
+            education_training_score = mean(education_skills_and_training_score), 
+            health_disability_score = mean(health_deprivation_and_disability_score),
+            crime_score = mean(crime_score), 
+            living_env_score = mean(living_environment_score), 
+            housing_score = mean(barriers_to_housing_and_services_score)) 
+
+# Getting IMD Decile by CCG
+ccg_imd$imd_decile <- ntile(ccg_imd$imd_score, 10)
 
 # Investigating the relationship between IMD and Hypertension Prevalence 
 # Investigate by Region 
@@ -586,19 +617,22 @@ ggplot(lsoa_hyper_imd, aes(x = imd_score, y = obs_hyper_prev)) +
 ggplot(lsoa_hyper_imd, aes(x = imd_score, y = exp_hyper_prev)) + 
   geom_point(aes(color = imd_decile)) +
   stat_smooth(method = 'lm', col = 'red', size = 1) + 
-  labs(x = "IMD Score", y = "Age Standardised Prevalence Rate")
+  labs(x = "IMD Score", y = "Age Standardised Prevalence Rate", fill = "IMD Decile", 
+       title = "Relationship Between Hypertension and Deprivation")
 
 # Seeing how the relationship changes when age adjusted
-ggplot(lsoa_hyper_imd, aes(x = imd_score, y = age_std_prev)) + 
-  geom_point(aes(color = imd_decile)) +
+ggplot(lsoa_hyper_imd, aes(x = imd_score, y = age_std_prev, color = imd_decile)) + 
+  geom_point() +
   stat_smooth(method = 'lm', col = 'red', size = 1) + 
-  labs(x = "IMD Score", y = "Age Standardised Prevalence Rate")
+  labs(x = "IMD Score", y = "Age Standardised Prevalence Rate", color = "IMD Decile",
+       title = "Relationship Between Hypertension and Deprivation") 
 
 # Comparing the ratio to IMD
 ggplot(lsoa_hyper_imd, aes(x = imd_score, y = obs_over_exp)) + 
   geom_point(aes(color = imd_decile)) + 
   stat_smooth(method = 'lm', col = 'red', size = 1) + 
-  labs(x = "IMD Score", y = "Reported Prevalence to Expected")
+  labs(x = "IMD Score", y = "Reported Prevalence to Expected", color = "IMD Decile", 
+       title = "Relationship between Deprivation and Hypertension Performance vs Expected")
 
 # Breaking down the relationship by Region 
 ## Midlands ##
@@ -621,6 +655,7 @@ lsoa_msoa <- read_csv("Output_Area_to_LSOA_to_MSOA_to_Local_Authority_District_(
 
 # Selecting Stoke on Trent
 stoke_on_trent_hyp <- subset(midlands_imd, CCG21CD == 'E38000175')
+stoke_on_trent_ccg <- subset(midlands_ccg, CCG21CD == "E38000175")
 # Finding the Mean IMD Score in Stoke-on-Trent
 mean(stoke_on_trent_hyp$imd_score) # 33.31
 # Aggregating at MSOA for plotting purposes
@@ -636,6 +671,31 @@ stoke_msoa <- merge(stoke_on_trent_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'L
             crime_score = mean(crime_score), 
             living_env_score = mean(living_environment_score), 
             housing_score = mean(barriers_to_housing_and_services_score))
+
+ggplot(stoke_msoa) + 
+  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
+  geom_point() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
+       title = "Standardised Hypertension Prevalence by MSOA in Stoke-on-Trent")
+
+tm_shape(stoke_on_trent_hyp) +
+  tm_fill(col = "age_std_prev", border.alpha = 0.5, title = "Hypertension Prevalence %", 
+              legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
+              lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
+  tm_layout(main.title = 'Hypertension Prevalence in Stoke-on-Trent', legend.outside = TRUE) +
+tm_shape(stoke_msoa) + 
+  tm_borders("black", lwd = 1)
+
+tm_shape(stoke_msoa) +
+  tm_polygons(col = "age_std_prev", border.alpha = 0.5, title = "Hypertension Prevalence %", 
+          legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
+          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
+  tm_layout(main.title = 'Hypertension Prevalence in Stoke-on-Trent', legend.outside = TRUE)
 
 # Selecting North Staffordshire
 north_staffordshire_hyp <- subset(midlands_imd, CCG21CD == 'E38000126')
@@ -654,6 +714,57 @@ north_staffordshire_msoa <- merge(north_staffordshire_hyp, lsoa_msoa, by.x = 'ls
             crime_score = mean(crime_score), 
             living_env_score = mean(living_environment_score), 
             housing_score = mean(barriers_to_housing_and_services_score))
+
+ggplot(north_staffordshire_msoa) + 
+  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
+  geom_point() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
+       title = "Standardised Hypertension Prevalence by MSOA in North Staffordshire")
+
+tm_shape(north_staffordshire_hyp) + 
+  tm_fill(col = "age_std_prev",  border.alpha = 0.5, title = "Hypertension Prevalence %", 
+              legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
+              lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'Hypertension Prevalence in East England', legend.outside = TRUE) + 
+tm_shape(north_staffordshire_msoa) + 
+  tm_borders("black", lwd = 1)
+
+# Merge two regions together
+stoke_staffordshire <- subset(midlands_imd, CCG21CD == 'E38000126' | CCG21CD == "E38000175")
+stoke_staffordshire_borders <- subset(midlands_ccg, CCG21CD == "E38000126" | CCG21CD == "E38000175")
+
+stoke_staff_prev <- tm_shape(stoke_staffordshire) + 
+  tm_fill(col = "age_std_prev",  border.alpha = 0.5, title = "Age Std. Prev. %", 
+          legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
+          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
+  tm_layout(main.title = 'Hypertension Prevalence in Stoke-on-Trent and North-Staffordshire', legend.outside = TRUE) + 
+  tm_shape(stoke_staffordshire_borders) + 
+  tm_borders("black", lwd = 1)
+
+stoke_staff_ratio <- tm_shape(stoke_staffordshire) + 
+  tm_fill(col = "obs_over_exp",  border.alpha = 0.5, title = "Obs/Exp Ratio", 
+          legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
+          labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'Hypertension Prevalence Compared to Expected', legend.outside = TRUE) + 
+  tm_shape(stoke_staffordshire_borders) + 
+  tm_borders("black", lwd = 1)
+
+stoke_staff_imd <- tm_shape(stoke_staffordshire) + 
+  tm_fill(col = "imd_decile",  border.alpha = 0.5, title = "IMD Decile", 
+          legend.hist = TRUE, palette = "RdBu", breaks = c(0, 2, 5, 8, 10), 
+          labels = c("High Deprivation", "Medium-High Deprivation", "Medium-Low Deprivation", "Low Deprivation")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
+  tm_layout(main.title = 'IMD Score in Stoke-on-Trent and North Staffordshire', legend.outside = TRUE) + 
+  tm_shape(stoke_staffordshire_borders) + 
+  tm_borders("black", lwd = 1)
+
+tmap_arrange(stoke_staff_prev, stoke_staff_imd)
 
 ## North-East England ##
 north_east_imd <- merge(north_east_ccg_hyper, LSOA_imd_cl, by.x = "lsoa_code", by.y = "lsoa_code_2011")
@@ -686,6 +797,22 @@ county_durham_msoa <- merge(county_durham_hyp, lsoa_msoa, by.x = 'lsoa_code', by
             living_env_score = mean(living_environment_score), 
             housing_score = mean(barriers_to_housing_and_services_score))
 
+ggplot(county_durham_msoa) + 
+  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
+  geom_point() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
+       title = "Standardised Hypertension Prevalence by MSOA in County Durham")
+
+tm_shape(county_durham_msoa) + 
+  tm_polygons(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
+              legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
+              lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(main.title = 'Hypertension Prevalence in East England', legend.outside = TRUE)
+
 # Sunderland
 sunderland_hyp <- subset(north_east_imd, CCG21CD == 'E38000176')
 # Finding the Mean IMD Score
@@ -703,6 +830,15 @@ sunderland_msoa <- merge(sunderland_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = '
             crime_score = mean(crime_score), 
             living_env_score = mean(living_environment_score), 
             housing_score = mean(barriers_to_housing_and_services_score))
+
+ggplot(sunderland_msoa) + 
+  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
+  geom_point() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
+       title = "Standardised Hypertension Prevalence by MSOA in Sunderland")
 
 # East Riding of Yorkshire
 east_riding_yorkshire_hyp <- subset(north_east_imd, CCG21CD == 'E38000052')
@@ -722,6 +858,15 @@ east_yorkshire_msoa <- merge(east_riding_yorkshire_hyp, lsoa_msoa, by.x = 'lsoa_
             living_env_score = mean(living_environment_score), 
             housing_score = mean(barriers_to_housing_and_services_score))
 
+ggplot(east_yorkshire_msoa) + 
+  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
+  geom_point() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
+       title = "Standardised Hypertension Prevalence by MSOA in the East Riding of Yorkshire")
+
 # North Lincolnshire
 north_lincolnshire_hyp <- subset(north_east_imd, CCG21CD == 'E38000122')
 # Finding the Mean IMD Score 
@@ -740,6 +885,14 @@ north_lincolnshire_msoa <- merge(north_lincolnshire_hyp, lsoa_msoa, by.x = 'lsoa
             living_env_score = mean(living_environment_score), 
             housing_score = mean(barriers_to_housing_and_services_score))
 
+ggplot(north_lincolnshire_msoa) + 
+  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
+  geom_point() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
+       title = "Standardised Hypertension Prevalence by MSOA in North Lincolnshire")
 
 ## North-West England ##
 north_west_imd <- merge(north_west_ccg_hyper, LSOA_imd_cl, by.x = "lsoa_code", by.y = "lsoa_code_2011")
@@ -772,6 +925,15 @@ blackpool_msoa <- merge(blackpool_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LS
             living_env_score = mean(living_environment_score), 
             housing_score = mean(barriers_to_housing_and_services_score))
 
+ggplot(blackpool_msoa) + 
+  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
+  geom_point() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
+       title = "Standardised Hypertension Prevalence by MSOA in Blackpool")
+
 # Fylde and Wyre
 fylde_and_wyre_hyp <- subset(north_west_imd, CCG21CD == 'E38000226')
 # Finding the Mean IMD Score 
@@ -789,6 +951,15 @@ fylde_and_wyre_msoa <- merge(fylde_and_wyre_hyp, lsoa_msoa, by.x = 'lsoa_code', 
             crime_score = mean(crime_score), 
             living_env_score = mean(living_environment_score), 
             housing_score = mean(barriers_to_housing_and_services_score))
+
+ggplot(fylde_and_wyre_msoa) + 
+  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
+  geom_point() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
+       title = "Standardised Hypertension Prevalence by MSOA in Fylde and Wyre")
 
 # St Helens
 st_helens_hyp <- subset(north_west_imd, CCG21CD == 'E38000172')
@@ -808,6 +979,15 @@ st_helens_msoa <- merge(st_helens_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LS
             living_env_score = mean(living_environment_score), 
             housing_score = mean(barriers_to_housing_and_services_score))
 
+ggplot(st_helens_msoa) + 
+  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
+  geom_point() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
+       title = "Standardised Hypertension Prevalence by MSOA in St Helens")
+
 # Tameside and Glossop
 tameside_and_glossop_hyp <- subset(north_west_imd, CCG21CD == 'E38000182')
 # Finding the Mean IMD Score 
@@ -825,6 +1005,15 @@ tameside_and_glossop_msoa <- merge(tameside_and_glossop_hyp, lsoa_msoa, by.x = '
             crime_score = mean(crime_score), 
             living_env_score = mean(living_environment_score), 
             housing_score = mean(barriers_to_housing_and_services_score))
+
+ggplot(tameside_and_glossop_msoa) + 
+  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
+  geom_point() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
+       title = "Standardised Hypertension Prevalence by MSOA in Tameside and Glossop")
 
 # Halton
 halton_hyp <- subset(north_west_imd, CCG21CD == 'E38000068')
@@ -844,6 +1033,14 @@ halton_msoa <- merge(halton_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD
             living_env_score = mean(living_environment_score), 
             housing_score = mean(barriers_to_housing_and_services_score))
 
+ggplot(halton_msoa) + 
+  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
+  geom_point() + coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
+             size = 1) +
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
+       title = "Standardised Hypertension Prevalence by MSOA in Halton")
 
 ## South-East England ## 
 south_east_imd <-  merge(south_east_ccg_hyper, LSOA_imd_cl, by.x = "lsoa_code", by.y = "lsoa_code_2011")
