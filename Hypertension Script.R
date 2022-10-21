@@ -185,8 +185,6 @@ lsoa_grouped <- lsoa_hyper_prev %>%
   group_by(lsoa_code) %>%
   summarise(obs_hyper_prev = sum(gp_coverage*prevalence_percent_21_22),
             exp_hyper_prev = sum(exp_hyp*gp_coverage),
-            over80_prev = sum(over80_prev*gp_coverage),
-            u79_prev = sum(gp_coverage*under79_prev),
             lsoa_pop = mean(lsoa_pop), 
             list_size_21_22 = sum(list_size_21_22), 
             register_21_22 = sum(register_21_22),
@@ -331,13 +329,18 @@ tm_shape(Eng_CCG) +
 # Breaking it Down by Region 
 # Midlands - Prevalence 
 ggplot(midlands_ccg_hyper) + 
-  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
-  geom_boxplot() + coord_flip() +
-  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
-             size = 1) +
+  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, fill = CCG21NM) +
+#  scale_fill_brewer(palette = "RdBu") + 
+  geom_boxplot(fatten = NULL) + 
+  coord_flip() +
+  stat_summary(fun = "mean",geom = "point", size = 2, color = "white") +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', size = 1) +
+  geom_text(aes(0, mean(age_std_prev), label = 'Midlands Mean', vjust = -0.5, hjust = -0.1)) +
+  geom_hline(yintercept = 17.09, color = 'red', size = 1, linetype = 'dashed') +
+  geom_text(aes(0, 17.09, label = 'National Average', color = 'red', vjust = -0.5, hjust = 1.1)) +
   theme(legend.position = "none") +
   labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
-       title = "Standardised Hypertension Prevalence by CCG")
+       title = "Standardised Hypertension Prevalence in the Midlands")
 # Achievement HYP003
 ggplot(midlands_ccg_hyper) + 
   aes(x = reorder(CCG21NM, -u79_achievement), y = u79_achievement, color = CCG21NM) + 
@@ -378,10 +381,12 @@ ggplot(midlands_ccg_hyper) +
 
 tm_shape(midlands_ccg_hyper) +
   tm_fill(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
-              legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
-          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
+          legend.hist = TRUE, 
+          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#F7F7F7", "#FDDBC7", "#D6604D", "#B2182B"), 
+          breaks = c(0, 5, 10, 15, 20, 25, 30, Inf), 
+          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
-  tm_layout(main.title = 'Hypertension Prevalence by CCG', legend.outside = TRUE) +
+  tm_layout(main.title = 'Hypertension Prevalence in the Midlands', legend.outside = TRUE) +
 tm_shape(midlands_ccg) +
   tm_borders()
 
@@ -390,26 +395,32 @@ tm_shape(midlands_ccg_hyper) +
           legend.hist = TRUE, palette = "-RdBu",
           breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
           labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Expected vs Observed Hypertension Rates in the Midlands', legend.outside = TRUE) +
   tm_shape(midlands_ccg) +
   tm_borders('black', lwd = 1)
 
 
 # North East and Yorkshire
-ggplot(north_east_hyper) + 
-  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
-  geom_boxplot() + coord_flip() +
-  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
-             size = 1) +
+ggplot(north_east_ccg_hyper) + 
+  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, fill = CCG21NM) + 
+  geom_boxplot(fatten = NULL) + 
+  coord_flip() +
+  stat_summary(fun = "mean",geom = "point", size = 2, color = "white") +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', size = 1) +
+  geom_text(aes(0, mean(age_std_prev), label = 'NE England Mean', vjust = -0, hjust = -0.1)) +
+  geom_hline(yintercept = 17.09, color = 'red', size = 1, linetype = 'dashed') +
+  geom_text(aes(0, 17.09, label = 'National Average', color = 'red', vjust = -0.5, hjust = 1.1)) +
   theme(legend.position = "none")  +
   labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
-       title = "Standardised Hypertension Prevalence by CCG")
+       title = "Standardised Hypertension Prevalence in NE England")
 
 tm_shape(north_east_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
-          legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
-          lables = c("0-5%", "5-10%", "10-15%", "15-20%", "20-25%", "25-30%", "30-35%", "35%+")) +
+          legend.hist = TRUE,  
+          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#F7F7F7", "#FDDBC7", "#D6604D", "#B2182B"), 
+          breaks = c(0, 5, 10, 15, 20, 25, 30, Inf), 
+          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30+")) + 
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in NE England', legend.outside = TRUE) +
 tm_shape(north_east_ccg) +
@@ -426,19 +437,25 @@ tm_shape(north_east_ccg_hyper) +
   tm_borders('black', lwd = 1)
 
 # NW England
-ggplot(north_west_hyper) + 
-  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
-  geom_boxplot() + coord_flip() +
-  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
-             size = 1) +
+ggplot(north_west_ccg_hyper) + 
+  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, fill = CCG21NM) + 
+  geom_boxplot(fatten = NULL) + 
+  coord_flip() +
+  stat_summary(fun = "mean",geom = "point", size = 2, color = "white") +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', size = 1) +
+  geom_text(aes(0, mean(age_std_prev), label = 'NW England Mean', vjust = -0.1, hjust = -0.1)) +
+  geom_hline(yintercept = 17.09, color = 'red', size = 1, linetype = 'dashed') +
+  geom_text(aes(0, 17.09, label = 'National Average', color = 'red', vjust = -0.5, hjust = 1.1)) +
   theme(legend.position = "none")  +
   labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
-       title = "Standardised Hypertension Prevalence by CCG")
+       title = "Standardised Hypertension Prevalence in NW England")
 
 tm_shape(north_west_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
-          legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
-          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
+          legend.hist = TRUE,  
+          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#F7F7F7", "#FDDBC7", "#D6604D", "#B2182B"), 
+          breaks = c(0, 5, 10, 15, 20, 25, 30, Inf), 
+          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in NW England', legend.outside = TRUE) +
 tm_shape(north_west_ccg) +
@@ -456,20 +473,26 @@ nw_ratio <- tm_shape(north_west_ccg_hyper) +
 
 # London 
 ggplot(london_ccg_hyper) + 
-  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
-  geom_boxplot() + coord_flip() +
-  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
-             size = 1) +
+  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, fill = CCG21NM) + 
+  geom_boxplot(fatten = NULL) + 
+  coord_flip() +
+  stat_summary(fun = "mean",geom = "point", size = 2, color = "white") +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', size = 1) +
+  geom_text(aes(0, mean(age_std_prev), label = 'London Mean', vjust = -0.5, hjust = 1.1)) +
+  geom_hline(yintercept = 17.09, color = 'red', size = 1, linetype = 'dashed') +
+  geom_text(aes(0, 17.09, label = 'National Average', color = 'red', vjust = -0.5, hjust = -0.1)) +
   theme(legend.position = "none")  +
   labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
-       title = "Standardised Hypertension Prevalence by CCG")
+       title = "Standardised Hypertension Prevalence in Lonon")
 
-tm_shape(london_hyper) +
+tm_shape(london_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
-              legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
-          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
+              legend.hist = TRUE, 
+          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#F7F7F7", "#FDDBC7", "#D6604D", "#B2182B"), 
+          breaks = c(0, 5, 10, 15, 20, 25, 30, Inf), 
+          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
-  tm_layout(main.title = 'Hypertension Prevalence by CCG', legend.outside = TRUE) +
+  tm_layout(main.title = 'Hypertension Prevalence in London', legend.outside = TRUE) +
 tm_shape(london_ccg) +
   tm_borders('black', lwd = 1)
 
@@ -484,20 +507,26 @@ tm_shape(london_ccg_hyper) +
   tm_borders('black', lwd = 1)
 
 # SE England
-ggplot(south_east_hyper) + 
-  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
-  geom_boxplot() + coord_flip() +
-  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
-             size = 1) +
+ggplot(south_east_ccg_hyper) + 
+  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, fill = CCG21NM) + 
+  geom_boxplot(fatten = NULL) + 
+  coord_flip() +
+  stat_summary(fun = "mean",geom = "point", size = 2, color = "white") +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', size = 1) +
+  geom_text(aes(0, mean(age_std_prev), label = 'SE England Mean', vjust = -0.5, hjust = 1.1)) +
+  geom_hline(yintercept = 17.09, color = 'red', size = 1, linetype = 'dashed') +
+  geom_text(aes(0, 17.09, label = 'National Average', color = 'red', vjust = -0.5, hjust = -0.1)) +
   theme(legend.position = "none")  +
   labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
-       title = "Standardised Hypertension Prevalence by CCG")
+       title = "Standardised Hypertension Prevalence in SE England")
 
 tm_shape(south_east_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
-          legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
-          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+          legend.hist = TRUE, 
+          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#F7F7F7", "#FDDBC7", "#D6604D", "#B2182B"), 
+          breaks = c(0, 5, 10, 15, 20, 25, 30, Inf), 
+          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30+")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in SE England', legend.outside = TRUE) +
 tm_shape(south_east_ccg) +
   tm_borders('black', lwd = 1)
@@ -507,26 +536,32 @@ tm_shape(south_east_ccg_hyper) +
           legend.hist = TRUE, palette = "-RdBu",
           breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
           labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Expected vs Observed Hypertension Rates in SE England', legend.outside = TRUE) +
   tm_shape(south_east_ccg) +
   tm_borders('black', lwd = 1)
 
 # SW England
-ggplot(south_west_hyper) + 
-  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
-  geom_boxplot() + coord_flip() +
-  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
-             size = 1) +
-  theme(legend.position = "none") +
+ggplot(south_west_ccg_hyper) + 
+  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, fill = CCG21NM) + 
+  geom_boxplot(fatten = NULL) + 
+  coord_flip() +
+  stat_summary(fun = "mean",geom = "point", size = 2, color = "white") +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', size = 1) +
+  geom_text(aes(0, mean(age_std_prev), label = 'SW England Mean', vjust = -0.5, hjust = 1.1)) +
+  geom_hline(yintercept = 17.09, color = 'red', size = 1, linetype = 'dashed') +
+  geom_text(aes(0, 17.09, label = 'National Average', color = 'red', vjust = -0.5, hjust = -0.1)) +
+  theme(legend.position = "none")  +
   labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
-       title = "Standardised Hypertension Prevalence by CCG")
+       title = "Standardised Hypertension Prevalence in SW England")
 
 tm_shape(south_west_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
-          legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
-          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+          legend.hist = TRUE, 
+          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#F7F7F7", "#FDDBC7", "#D6604D", "#B2182B"), 
+          breaks = c(0, 5, 10, 15, 20, 25, 30, Inf), 
+          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30+")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in SW England', legend.outside = TRUE) +
 tm_shape(south_west_ccg) +
   tm_borders('black', lwd = 1)
@@ -536,25 +571,31 @@ tm_shape(south_west_ccg_hyper) +
           legend.hist = TRUE, palette = "-RdBu",
           breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
           labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
+  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Expected vs Observed Hypertension Rates in SW England', legend.outside = TRUE) +
   tm_shape(south_west_ccg) +
   tm_borders('black', lwd = 1)
 
-# East England
-ggplot(east_eng_hyper) + 
-  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
-  geom_boxplot() + coord_flip() +
-  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
-             size = 1) +
+# East England  
+ggplot(east_eng_ccg_hyper) + 
+  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, fill = CCG21NM) + 
+  geom_boxplot(fatten = NULL) + 
+  coord_flip() +
+  stat_summary(fun = "mean",geom = "point", size = 2, color = "white") +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', size = 1) +
+  geom_text(aes(0, mean(age_std_prev), label = 'East England Mean', vjust = -0.5, hjust = 1.1)) +
+  geom_hline(yintercept = 17.09, color = 'red', size = 1, linetype = 'dashed') +
+  geom_text(aes(0, 17.09, label = 'National Average', color = 'red', vjust = -0.5, hjust = -0.1)) +
   theme(legend.position = "none")  +
   labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
-       title = "Standardised Hypertension Prevalence by CCG")
+       title = "Standardised Hypertension Prevalence in East England")
 
 tm_shape(east_eng_ccg_hyper) +
   tm_fill(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
-              legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
-          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
+          legend.hist = TRUE,
+          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#F7F7F7", "#FDDBC7", "#D6604D", "#B2182B"), 
+          breaks = c(0, 5, 10, 15, 20, 25, 30, Inf), 
+          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in East England', legend.outside = TRUE) +
 tm_shape(east_eng_ccg) +
@@ -655,7 +696,6 @@ lsoa_msoa <- read_csv("Output_Area_to_LSOA_to_MSOA_to_Local_Authority_District_(
 
 # Selecting Stoke on Trent
 stoke_on_trent_hyp <- subset(midlands_imd, CCG21CD == 'E38000175')
-stoke_on_trent_ccg <- subset(midlands_ccg, CCG21CD == "E38000175")
 # Finding the Mean IMD Score in Stoke-on-Trent
 mean(stoke_on_trent_hyp$imd_score) # 33.31
 # Aggregating at MSOA for plotting purposes
@@ -673,8 +713,8 @@ stoke_msoa <- merge(stoke_on_trent_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'L
             housing_score = mean(barriers_to_housing_and_services_score))
 
 ggplot(stoke_msoa) + 
-  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
-  geom_point() + coord_flip() +
+  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev) + 
+  geom_point(size = 3) + coord_flip() +
   geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
              size = 1) +
   theme(legend.position = "none")  +
@@ -2150,7 +2190,7 @@ QOF_22 <- merge(QOF_21, ccg_agg, by.x = 'new_code', by.y = 'CCG21CDH', all = TRU
 
 QOF_prev <- QOF_22 %>%
   rename(ccg_code = new_code) %>%
-  group_by(CCG21CD) %>%
+  group_by(ccg_code) %>%
   summarise(listsize_15 = sum(tot_list_size_14_15, na.rm = TRUE), 
             register_15 = sum(tot_register_14_15, na.rm = TRUE), 
             obsprev_15 = mean(avg_prevalence_14_15, na.rm = TRUE), 
@@ -2203,7 +2243,7 @@ QOF_prev <- QOF_22 %>%
 #### Interupted Time Series Analysis ####
 # Transforming the Data for ITS purposes 
 QOF_prev_long <- QOF_prev %>%
-  pivot_longer(!CCG21CD,
+  pivot_longer(!ccg_code,
                names_to = c("category", "year"),
                names_pattern = "([A-Za-z]+)_(\\d+)", # separates variables by characters and then numbers, similar to name_sep but more sophisticated
                values_to = "score")
@@ -2234,7 +2274,7 @@ summary(fit_14_18)
 
 # Fitting the yearly increase (0.11226) to the 2019 data to account for the change in prevalence 
 QOF_prev_19_22 <- QOF_prev %>%
-  select(CCG21CD, agestdprev_20, agestdprev_21, agestdprev_22)
+  select(ccg_code, agestdprev_20, agestdprev_21, agestdprev_22)
 
 # Calculating the expected prevalence 
 QOF_prev_19_22 <- QOF_prev_19_22 %>%
@@ -2244,8 +2284,13 @@ QOF_prev_19_22 <- QOF_prev_19_22 %>%
          age_std_prev_diff_21 = agestdprev_21 - exp_age_std_prev_21, 
          age_std_prev_diff_22 = agestdprev_22 - exp_age_std_prev_22) 
 
+# Merging prevalence to population data in order to find absolute totals
+hyper_abs_21 <- merge(QOF_prev_19_22, age_dist_21_cl, by = 'ccg_code') %>%
+  select(ccg_code, agestdprev_20, agestdprev_21, agestdprev_22, exp_age_std_prev_21, 
+         exp_age_std_prev_22, age_std_prev_diff_21, age_std_prev_diff_22, all_all)
+
 # plotting differences
-prev_diff_shp <- merge(Eng_CCG, QOF_prev_19_22, by = 'CCG21CD')
+prev_diff_shp <- merge(Eng_CCG, QOF_prev_19_22, by = 'CCG21CD') 
 
 # 2021 difference
 tm_shape(prev_diff_shp) + 
