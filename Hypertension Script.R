@@ -250,7 +250,10 @@ ccg_agg <- ccg_grouped %>%
             avg_u79_achievement_21_22 = mean(u79_achievement), 
             avg_u79_intervention_21_22 = mean(u79_intervention), 
             avg_o80_achievement_21_22 = mean(o80_achievement), 
-            avg_o80_intervention_21_22 = mean(o80_intervention))
+            avg_o80_intervention_21_22 = mean(o80_intervention)) %>%
+  # including variable to indicate if above or below national average
+  mutate(above_average = case_when(age_std_prev_21_22 > 17.10 ~ 1, 
+                                   T ~ 0))
 
 ccg_agg_shp <- merge(Eng_CCG, ccg_agg, by = c('CCG21CD', 'CCG21NM'))
 ccg_agg_region <- merge(ccg_agg_shp, ccg_region) 
@@ -258,6 +261,24 @@ ccg_agg_region <- merge(ccg_agg_shp, ccg_region)
 top10_ccg <- ccg_agg_region %>%
   arrange(desc(age_std_prev_21_22)) %>%
   slice(1:11)
+
+# Plotting the Top Decile of CCGs by Prevalence
+ggplot(top10_ccg, aes(x = reorder(CCG21NM, -age_std_prev_21_22), y = age_std_prev_21_22)) + 
+  geom_point(size = 3) + 
+  coord_flip() +
+  theme(legend.position = "none") + 
+  labs(x = "CCG", y = "Age Standardised Prevalence Rate (%)", 
+       title = "Hypertension Prevalence Distribution Amongst Top 10% of CCGs")
+
+# Plotting how many CCGs in each Region are Above National Average
+ggplot(ccg_agg_region, aes(x = fct_infreq(NHSER21NM), y = above_average, fill = NHSER21NM)) + 
+  geom_col() +
+  labs(x = "Region", y = "Number of CCGs", 
+             title = "Number of CCGs Above the National Average by Region") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  scale_fill_brewer(palette = "Dark2") 
+  
   
 # Subsetting CCGs by Region
 # Obtaining the Region Boundaries
@@ -308,14 +329,12 @@ ggplot(ccg_hyper) +
              size = 1) +
   theme(legend.position = "none")
 
-#### Doesn't Work ####
 tm_shape(ccg_agg_shp) + 
-  tm_polygons(col = 'age_std_prev', border.alpha = 0.8, title = "Age Std. Prevalence %", legend.hist = TRUE, 
+  tm_polygons(col = 'age_std_prev_21_22', border.alpha = 0.8, title = "Age Std. Prevalence %", legend.hist = TRUE, 
               palette = "-RdBu") + 
   tm_compass(position = c("right", "top")) +
-  tm_scale_bar(position = c("left", "bottom")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
   tm_layout(main.title = "Hypertension Prevalence by CCG", legend.outside = TRUE)
-#####################
 
 tm_shape(hyper_prev_shp) + 
   tm_fill(col = 'age_std_prev', border.alpha = 0.8, title = "Age Std. Prevalence %", legend.hist = TRUE, 
@@ -326,7 +345,7 @@ tm_shape(hyper_prev_shp) +
 tm_shape(Eng_CCG) + 
   tm_borders()
 
-# Breaking it Down by Region 
+#### Breaking it Down by Region ####
 # Midlands - Prevalence 
 ggplot(midlands_ccg_hyper) + 
   aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, fill = CCG21NM) +
@@ -639,13 +658,26 @@ ggplot(ccg_hyper) +
   geom_density(alpha = 0.25)
 
 ggplot(ccg_hyper) + 
-  aes(x = reorder(NHSER21NM, -age_std_prev), y = age_std_prev, color = NHSER21NM) + 
-  geom_boxplot() +
+  aes(x = reorder(NHSER21NM, -age_std_prev), y = age_std_prev, fill = NHSER21NM) + 
+  geom_boxplot(fatten = NULL) +
+  stat_summary(fun = "mean", geom = "point", size = 2, color = "white") + 
   coord_flip() +
-  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
-             size = 1) + 
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', size = 1) + 
+  geom_text(aes(0, mean(age_std_prev), label = "National Average", vjust = -0.5, hjust = 1.05)) +
+  theme(legend.position = "none") +
   labs(x = "Region", y = "Age Standardised Prevalence Rate (%)", 
        title = "Standardised Hypertension Prevalence by Region")
+
+geom_boxplot(fatten = NULL) + 
+  coord_flip() +
+  stat_summary(fun = "mean",geom = "point", size = 2, color = "white") +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', size = 1) +
+  geom_text(aes(0, mean(age_std_prev), label = 'East England Mean', vjust = -0.5, hjust = 1.1)) +
+  geom_hline(yintercept = 17.09, color = 'red', size = 1, linetype = 'dashed') +
+  geom_text(aes(0, 17.09, label = 'National Average', color = 'red', vjust = -0.5, hjust = -0.1)) +
+  theme(legend.position = "none")  +
+  labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
+       title = "Standardised Hypertension Prevalence in East England")
 
 
 # Investigate relationship between IMD and Hypertension Prevalence
@@ -1177,6 +1209,35 @@ undiagnosed_hyp_prev <- hse_qof_comp %>%
          sub_icb_loc_name, undiagnosed_hyp) %>%
   rename(hse_prevalence = percent, 
          practice_code = code)
+
+# finding absoluate prevalence at GP level 
+abs_gp_hyper <- merge(undiagnosed_hyp_prev, GP_age_dist_cl, by.x = 'practice_code', by.y = 'area_code') %>%
+  # selecting variables of interest 
+  select(practice_code, practice_name, gp_pop, hse_prevalence, prevalence_percent_21_22, undiagnosed_hyp,
+         sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
+  # Calculating total undiagnosed by GP 
+  mutate(undiagnosed_totals = (undiagnosed_hyp/100)*gp_pop)
+
+sub_icb_abs <- abs_gp_hyper %>%
+  group_by(sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
+  summarise(undiagnosed_hypertension = sum(undiagnosed_totals), 
+            avg_undiagnosed_percent = mean(undiagnosed_hyp),
+            sub_icb_pop = sum(gp_pop))
+
+lsoa_undiagnosed <- merge(undiagnosed_hyp_prev, GP_lsoa_data, by = 'practice_code') %>%
+  mutate(gp_coverage = number_of_patients/lsoa_pop) %>% # new variable for GP Coverage by LSOA
+  group_by(lsoa_code) %>% # grouping by LSOA 
+  summarise(observed_prevalence = sum(prevalence_percent_21_22*gp_coverage),
+            hse_prevalence = sum(hse_prevalence*gp_coverage), 
+            undiagnosed_prevalence = sum(undiagnosed_hyp*gp_coverage))
+
+# Loading in Population Data to get Undiagnosed Totals
+lsoa_pop <- read_csv("~/Hypertension/Population Age Distributions/lsoa_all_age_estimates.csv", skip = 4) %>%
+  clean_names() %>%
+  select(lsoa_code, lsoa_name, all_ages, la_code_2021_boundaries, la_name_2021_boundaries)
+
+abs_undiagnosed <- merge(lsoa_undiagnosed, lsoa_pop, by = 'lsoa_code') %>%
+  mutate(tot_undiagnosed = (undiagnosed_prevalence/100)*all_ages)
 
 #### Objective 3 ####
 #### Loading in QOF data from 2014-15 to 2019-20 ####
@@ -2190,7 +2251,7 @@ QOF_22 <- merge(QOF_21, ccg_agg, by.x = 'new_code', by.y = 'CCG21CDH', all = TRU
 
 QOF_prev <- QOF_22 %>%
   rename(ccg_code = new_code) %>%
-  group_by(ccg_code) %>%
+  group_by(CCG21CD) %>%
   summarise(listsize_15 = sum(tot_list_size_14_15, na.rm = TRUE), 
             register_15 = sum(tot_register_14_15, na.rm = TRUE), 
             obsprev_15 = mean(avg_prevalence_14_15, na.rm = TRUE), 
@@ -2243,7 +2304,7 @@ QOF_prev <- QOF_22 %>%
 #### Interupted Time Series Analysis ####
 # Transforming the Data for ITS purposes 
 QOF_prev_long <- QOF_prev %>%
-  pivot_longer(!ccg_code,
+  pivot_longer(!CCG21CD,
                names_to = c("category", "year"),
                names_pattern = "([A-Za-z]+)_(\\d+)", # separates variables by characters and then numbers, similar to name_sep but more sophisticated
                values_to = "score")
@@ -2274,7 +2335,7 @@ summary(fit_14_18)
 
 # Fitting the yearly increase (0.11226) to the 2019 data to account for the change in prevalence 
 QOF_prev_19_22 <- QOF_prev %>%
-  select(ccg_code, agestdprev_20, agestdprev_21, agestdprev_22)
+  select(CCG21CD, agestdprev_20, agestdprev_21, agestdprev_22)
 
 # Calculating the expected prevalence 
 QOF_prev_19_22 <- QOF_prev_19_22 %>%
@@ -2283,11 +2344,6 @@ QOF_prev_19_22 <- QOF_prev_19_22 %>%
          # Now calculating the difference between the expected change and obs change to get the covid effect
          age_std_prev_diff_21 = agestdprev_21 - exp_age_std_prev_21, 
          age_std_prev_diff_22 = agestdprev_22 - exp_age_std_prev_22) 
-
-# Merging prevalence to population data in order to find absolute totals
-hyper_abs_21 <- merge(QOF_prev_19_22, age_dist_21_cl, by = 'ccg_code') %>%
-  select(ccg_code, agestdprev_20, agestdprev_21, agestdprev_22, exp_age_std_prev_21, 
-         exp_age_std_prev_22, age_std_prev_diff_21, age_std_prev_diff_22, all_all)
 
 # plotting differences
 prev_diff_shp <- merge(Eng_CCG, QOF_prev_19_22, by = 'CCG21CD') 
@@ -2305,6 +2361,20 @@ tm_shape(prev_diff_shp) +
               legend.hist = TRUE, palette = "RdBu") +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Unreported Hypertension in the UK (2022)', legend.outside = TRUE) 
+
+# Finding Absolute Values in Differences
+# Load CCG Population Data
+ccg_pop <- read_csv("ccg population estimates.csv", skip = 6) %>%
+  clean_names() %>%
+  select(ccg_code, ccg_name, nhser21_name, all_ages)
+
+# Merge population to covid effect
+abs_hyper_shp <- merge(prev_diff_shp, ccg_pop, by.x = 'CCG21CD', by.y = 'ccg_code')
+
+# calculate absolute totals
+abs_hyper_shp <- abs_hyper_shp %>%
+  mutate(undiagnosed_21 = (age_std_prev_diff_21/100)*all_ages, 
+         undiagnosed_22 = (age_std_prev_diff_22/100)*all_ages)
 
 #### OLS ####
 # Only up to 2020 for OLS 
