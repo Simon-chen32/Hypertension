@@ -1224,6 +1224,7 @@ sub_icb_abs <- abs_gp_hyper %>%
             avg_undiagnosed_percent = mean(undiagnosed_hyp),
             sub_icb_pop = sum(gp_pop))
 
+#### LSOA Calculations ####
 lsoa_undiagnosed <- merge(undiagnosed_hyp_prev, GP_lsoa_data, by = 'practice_code') %>%
   mutate(gp_coverage = number_of_patients/lsoa_pop) %>% # new variable for GP Coverage by LSOA
   group_by(lsoa_code) %>% # grouping by LSOA 
