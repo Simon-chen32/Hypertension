@@ -1188,6 +1188,53 @@ northwest_imd <- tm_shape(nw_imd_shp) +
 
 tmap_arrange(nw_age_std_hyp, nw_ratio, northwest_imd)
 
+#### For Godspower #### 
+ccg_data <- merge(ccg_agg, ccg_pop, by.x = 'CCG21CD', by.y = 'ccg_code')
+ccg_data <- merge(ccg_data, ccg_age_dist_21, by.x = 'CCG21CDH', by.y = 'ccg_code') 
+
+ccg_data_cl <- ccg_data %>%
+  subset(select = -c(36:53))
+
+regional_hyper <- ccg_data %>%
+  mutate(abs_hypertension = (age_std_prev_21_22/100)*all_ages) %>%
+  group_by(nhser21_name) %>%
+  summarise(hypertension_prevalence = mean(avg_prevalence_21_22), 
+            age_std_prev = mean(age_std_prev_21_22), 
+            cases_hypertension = sum(abs_hypertension),
+            population = sum(total_all), 
+            total_male = sum(total_male), 
+            total_female = sum(total_female), 
+            male0_15 = sum(male0_15), 
+            male16_24 = sum(male16_24), 
+            male25_34 = sum(male25_34), 
+            male35_44 = sum(male35_44), 
+            male45_54 = sum(male45_54), 
+            male55_64 = sum(male55_64), 
+            male65_74 = sum(male65_74), 
+            male75plus = sum(male75plus), 
+            male_prev16_24 = mean(exp_hyp_16_24_male), 
+            male_prev25_34 = mean(exp_hyp_25_34_male), 
+            male_prev35_44 = mean(exp_hyp_35_44_male), 
+            male_prev45_54 = mean(exp_hyp_45_54_male), 
+            male_prev55_64 = mean(exp_hyp_55_64_male), 
+            male_prev65_74 = mean(exp_hyp_65_74_male), 
+            male_prev75plus = mean(exp_hyp_75plus_male), 
+            female0_15 = sum(female0_15), 
+            female16_24 = sum(female16_24), 
+            female25_34 = sum(female25_34), 
+            female35_44 = sum(female35_44), 
+            female45_54 = sum(female45_54), 
+            female55_64 = sum(female55_64), 
+            female65_74 = sum(female65_74), 
+            female75plus = sum(female75plus), 
+            female_prev16_24 = mean(exp_hyp_16_24_female), 
+            female_prev25_34 = mean(exp_hyp_25_34_female), 
+            female_prev35_44 = mean(exp_hyp_35_44_female), 
+            female_prev45_54 = mean(exp_hyp_45_54_female), 
+            female_prev55_64 = mean(exp_hyp_55_64_female), 
+            female_prev65_74 = mean(exp_hyp_65_74_female), 
+            female_prev75plus = mean(exp_hyp_75plus_female))
+
 #### Objective 2 ####
 # Comparing QOF Prevalence to HSE Prevalence by GP 
 # Loading in HSE GP Prevalence data 
@@ -2343,8 +2390,9 @@ QOF_prev_19_22 <- QOF_prev_19_22 %>%
   mutate(exp_age_std_prev_21 = agestdprev_20 + 0.11226, 
          exp_age_std_prev_22 = agestdprev_20 + 0.11226*2, 
          # Now calculating the difference between the expected change and obs change to get the covid effect
-         age_std_prev_diff_21 = agestdprev_21 - exp_age_std_prev_21, 
-         age_std_prev_diff_22 = agestdprev_22 - exp_age_std_prev_22) 
+         age_std_prev_diff_21 = case_when(agestdprev_21 - exp_age_std_prev_21 <= 0 ~ age_std_prev_diff_21, T ~ 0),
+         age_std_prev_diff_22 = agestdprev_22 - exp_age_std_prev_22)
+  
 
 # plotting differences
 prev_diff_shp <- merge(Eng_CCG, QOF_prev_19_22, by = 'CCG21CD') 
@@ -2352,7 +2400,7 @@ prev_diff_shp <- merge(Eng_CCG, QOF_prev_19_22, by = 'CCG21CD')
 # 2021 difference
 tm_shape(prev_diff_shp) + 
   tm_polygons(col = 'age_std_prev_diff_21', border.alpha = 0.5, title = "Unreported Hypertension %", 
-              legend.hist = TRUE, palette = "RdBu") +
+              legend.hist = TRUE, palette = "Reds") +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Unreported Hypertension in the UK (2021)', legend.outside = TRUE) 
 
@@ -2375,75 +2423,28 @@ abs_hyper_shp <- merge(prev_diff_shp, ccg_pop, by.x = 'CCG21CD', by.y = 'ccg_cod
 # calculate absolute totals
 abs_hyper_shp <- abs_hyper_shp %>%
   mutate(undiagnosed_21 = (age_std_prev_diff_21/100)*all_ages, 
-         undiagnosed_22 = (age_std_prev_diff_22/100)*all_ages)
+         undiagnosed_22 = case_when(age_std_prev_diff_22 > 0 ~ ((age_std_prev_diff_22+age_std_prev_diff_21)/100)*all_ages, 
+                                    T ~ ((age_std_prev_diff_22-age_std_prev_diff_21)/100)*all_ages))
 
-#### OLS ####
-# Only up to 2020 for OLS 
-QOF_data <- QOF_20 %>% 
-  rename(ccg_code = new_code) %>%
-  group_by(ccg_code) %>%
-  summarise(tot_list_size_14_15 = sum(tot_list_size_14_15, na.rm = TRUE), 
-            tot_register_14_15 = sum(tot_register_14_15, na.rm = TRUE), 
-            avg_prevalence_14_15 = mean(avg_prevalence_14_15, na.rm = TRUE), 
-            avg_exp_prev_14_15 = mean(exp_hyp_14_15, na.rm = TRUE),
-            avg_age_std_prev_14_15 = mean(age_std_prev_14_15, na.rm = TRUE),
-            avg_obs_exp_ratio_14_15 = mean(obs_over_exp_15, na.rm = TRUE),
-            tot_numerator_14_15 = sum(tot_numerator_14_15, na.rm = TRUE), 
-            tot_denominator_14_15 = sum(tot_denominator_14_15, na.rm = TRUE),
-            avg_achievement_14_15 = mean(avg_achievement_14_15, na.rm = TRUE), 
-            avg_intervention_14_15 = mean(avg_intervention_14_15, na.rm = TRUE), 
-            tot_list_size_15_16 = sum(tot_list_size_15_16, na.rm = TRUE), 
-            tot_register_15_16 = sum(tot_register_15_16, na.rm = TRUE), 
-            avg_prevalence_15_16 = mean(avg_prevalence_15_16, na.rm = TRUE), 
-            avg_exp_prev_15_16 = mean(exp_hyp_15_16, na.rm = TRUE),
-            avg_age_std_prev_15_16 = mean(age_std_prev_15_16, na.rm = TRUE),
-            avg_obs_exp_ratio_15_16 = mean(obs_over_exp_16, na.rm = TRUE),
-            tot_numerator_15_16 = sum(tot_numerator_15_16, na.rm = TRUE), 
-            tot_denominator_15_16 = sum(tot_denominator_15_16, na.rm = TRUE),
-            avg_achievement_15_16 = mean(avg_achievement_15_16, na.rm = TRUE), 
-            avg_intervention_15_16 = mean(avg_intervention_15_16, na.rm = TRUE),
-            tot_list_size_16_17 = sum(tot_list_size_16_17, na.rm = TRUE), 
-            tot_register_16_17 = sum(tot_register_16_17, na.rm = TRUE), 
-            avg_prevalence_16_17 = mean(avg_prevalence_16_17, na.rm = TRUE), 
-            avg_exp_prev_16_17 = mean(exp_hyp_16_17, na.rm = TRUE),
-            avg_age_std_prev_16_17 = mean(age_std_prev_16_17, na.rm = TRUE),
-            avg_obs_exp_ratio_16_17 = mean(obs_over_exp_17, na.rm = TRUE),
-            tot_numerator_16_17 = sum(tot_numerator_16_17, na.rm = TRUE), 
-            tot_denominator_16_17 = sum(tot_denominator_16_17, na.rm = TRUE),
-            avg_achievement_16_17 = mean(avg_achievement_16_17, na.rm = TRUE), 
-            avg_intervention_16_17 = mean(avg_intervention_16_17, na.rm = TRUE),
-            tot_list_size_17_18 = sum(tot_list_size_17_18, na.rm = TRUE), 
-            tot_register_17_18 = sum(tot_register_17_18, na.rm = TRUE), 
-            avg_prevalence_17_18 = mean(avg_prevalence_17_18, na.rm = TRUE), 
-            avg_exp_prev_17_18 = mean(exp_hyp_17_18, na.rm = TRUE),
-            avg_age_std_prev_17_18 = mean(age_std_prev_17_18, na.rm = TRUE),
-            avg_obs_exp_ratio_17_18 = mean(obs_over_exp_18, na.rm = TRUE),
-            tot_numerator_17_18 = sum(tot_numerator_17_18, na.rm = TRUE), 
-            tot_denominator_17_18 = sum(tot_denominator_17_18, na.rm = TRUE),
-            avg_achievement_17_18 = mean(avg_achievement_17_18, na.rm = TRUE), 
-            avg_intervention_17_18 = mean(avg_intervention_17_18, na.rm = TRUE),
-            tot_list_size_18_19 = sum(tot_list_size_18_19, na.rm = TRUE), 
-            tot_register_18_19 = sum(tot_register_18_19, na.rm = TRUE), 
-            avg_prevalence_18_19 = mean(avg_prevalence_18_19, na.rm = TRUE), 
-            avg_exp_prev_18_19 = mean(exp_hyp_18_19, na.rm = TRUE),
-            avg_age_std_prev_18_19 = mean(age_std_prev_18_19, na.rm = TRUE),
-            avg_obs_exp_ratio_18_19 = mean(obs_over_exp_19, na.rm = TRUE),
-            tot_numerator_18_19 = sum(tot_numerator_18_19, na.rm = TRUE), 
-            tot_denominator_18_19 = sum(tot_denominator_18_19, na.rm = TRUE),
-            avg_achievement_18_19 = mean(avg_achievement_18_19, na.rm = TRUE), 
-            avg_intervention_18_19 = mean(avg_intervention_18_19, na.rm = TRUE),
-            tot_list_size_19_20 = sum(tot_list_size_19_20, na.rm = TRUE), 
-            tot_register_19_20 = sum(tot_register_19_20, na.rm = TRUE), 
-            avg_prevalence_19_20 = mean(avg_prevalence_19_20, na.rm = TRUE), 
-            avg_exp_prev_19_20 = mean(exp_hyp_19_20, na.rm = TRUE),
-            avg_age_std_prev_19_20 = mean(age_std_prev_19_20, na.rm = TRUE),
-            avg_obs_exp_ratio_19_20 = mean(obs_over_exp_20, na.rm = TRUE),
-            tot_u79_numerator_19_20 = sum(tot_u79_numerator_19_20, na.rm = TRUE), 
-            tot_u79_denominator_19_20 = sum(tot_u79_denominator_19_20, na.rm = TRUE),
-            avg_u79_achievement_19_20 = mean(avg_u79_achievement_19_20, na.rm = TRUE), 
-            avg_u79_intervention_19_20 = mean(avg_u79_intervention_19_20, na.rm = TRUE), 
-            tot_o80_numerator_19_20 = sum(tot_o80_numerator_19_20, na.rm = TRUE), 
-            tot_o80_denominator_19_20 = sum(tot_o80_denominator_19_20, na.rm = TRUE), 
-            avg_o80_achievement_19_20 = mean(avg_o80_achievement_19_20, na.rm = TRUE), 
-            avg_o80_intervention_19_20 = mean(avg_o80_intervention_19_20, na.rm = TRUE))
+# Merge all the undiagnosed data into one column 
+abs_hyper_long <- abs_hyper_shp %>%
+  pivot_longer(cols = starts_with("undiagnosed"), 
+               names_to = "year", names_prefix = "undiagnosed_", 
+               values_to = "undiagnosed_totals") %>%
+  select(-OBJECTID, -ccg_name)
+
+# merge to regional data 
+ggplot(abs_hyper_long, aes(x = nhser21_name, y = undiagnosed_totals, fill = year)) + 
+  geom_col() +
+  labs(x = "Region", y = "Missed Diagnoses", title = "Missed Diagnoses by Region") +
+  scale_fill_manual(values = c("#00a3c7", "#d8b2b4")) + 
+  stat_summary(fun = sum, aes(label = format(..y.., digits = 5), group = nhser21_name), geom = "text")
+
+# Find Regional values 
+regional_totals <- abs_hyper_long %>%
+  group_by(nhser21_name, year) %>%
+  summarise(undiagnosed_total = round(sum(undiagnosed_totals), 0))
+
+
+
 
