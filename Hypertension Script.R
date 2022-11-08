@@ -1297,32 +1297,16 @@ abs_gp_hyper <- merge(undiagnosed_hyp_prev, GP_age_dist_cl, by.x = 'practice_cod
 
 sub_icb_abs <- abs_gp_hyper %>%
   group_by(sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
-  summarise(undiagnosed_hypertension = sum(undiagnosed_totals), 
+  summarise(undiagnosed_hypertension = round(sum(undiagnosed_totals), digits = 0), 
             avg_undiagnosed_percent = mean(undiagnosed_hyp),
             sub_icb_pop = sum(gp_pop))
 
-#### LSOA Calculations ####
-lsoa_undiagnosed <- merge(undiagnosed_hyp_prev, GP_lsoa_data, by = 'practice_code') %>%
-  mutate(gp_coverage = number_of_patients/lsoa_pop) %>% # new variable for GP Coverage by LSOA
-  group_by(lsoa_code) %>% # grouping by LSOA 
-  summarise(observed_prevalence = sum(prevalence_percent_21_22*gp_coverage),
-            hse_prevalence = sum(hse_prevalence*gp_coverage), 
-            undiagnosed_prevalence = sum(undiagnosed_hyp*gp_coverage))
-
-# Loading in Population Data to get Undiagnosed Totals
-lsoa_pop <- read_csv("~/Hypertension/Population Age Distributions/lsoa_all_age_estimates.csv", skip = 4) %>%
-  clean_names() %>%
-  select(lsoa_code, lsoa_name, all_ages, la_code_2021_boundaries, la_name_2021_boundaries)
-
-abs_undiagnosed <- merge(lsoa_undiagnosed, lsoa_pop, by = 'lsoa_code') %>%
-  mutate(tot_undiagnosed = round((undiagnosed_prevalence/100)*all_ages, digits = 0))
-
-regional_abs_undiagnosed <- merge(abs_undiagnosed, lsoa_ccg_region, by.x = 'lsoa_code', by.y = 'geo_code') %>%
+regional_abs_undiagnosed <- merge(sub_icb_abs, ccg_region, by.x = 'sub_icb_loc_ods_code', by.y = 'CCG21CDH') %>%
   group_by(NHSER21NM, NHSER21CD) %>%
-  summarise(hypertension_prev = mean(observed_prevalence),
-            hse_prev = mean(hse_prevalence),
-            undiagnosed_prev = mean(undiagnosed_prevalence),
-            tot_undiagnosed = sum(tot_undiagnosed))
+  summarise(undiagnosed_prev = mean(avg_undiagnosed_percent),
+            tot_undiagnosed = sum(undiagnosed_hypertension), 
+            region_population = sum(sub_icb_pop)) %>%
+  mutate(rate_per_100000 = round(tot_undiagnosed/(region_population/100000), digits = 2))
 
 
 #### Objective 3 ####
@@ -2456,6 +2440,15 @@ tm_shape(prev_diff_shp) +
 ccg_pop <- read_csv("ccg population estimates.csv", skip = 6) %>%
   clean_names() %>%
   select(ccg_code, ccg_name, nhser21_name, all_ages)
+
+# Creating a file that separates by age for GP
+ccg_pop_all <- read_csv("ccg population estimates.csv", skip = 6) %>%
+  clean_names() %>%
+  mutate(under79_pop = rowSums(select(., x0:x79)),
+         over80_pop = rowSums(select(., x80:x90))) %>%
+  select(-starts_with('x')) %>%
+  drop_na()
+
 
 # Merge population to covid effect
 abs_hyper_shp <- merge(prev_diff_shp, ccg_pop, by.x = 'CCG21CD', by.y = 'ccg_code')
