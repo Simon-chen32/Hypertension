@@ -36,7 +36,8 @@ GP_age_dist_wide <- GP_age_dist %>%
          male45_54 = rowSums(select(., x45_49_yrs_male:x50_54_yrs_male)), 
          male55_64 = rowSums(select(., x55_59_yrs_male:x60_64_yrs_male)), 
          male65_74 = rowSums(select(., x65_69_yrs_male:x70_74_yrs_male)), 
-         male75plus = rowSums(select(., x75_79_yrs_male:x95_yrs_male)), 
+         male75 = rowSums(select(., x75_79_yrs_male)), 
+         male80plus =rowSums(select(., x80_84_yrs_male:x95_yrs_male)), 
          female0_15 = rowSums(select(., x0_4_yrs_female:x10_14_yrs_female)), 
          female16_24 = rowSums(select(., x15_19_yrs_female:x20_24_yrs_female)), 
          female25_34 = rowSums(select(., x25_29_yrs_female:x30_34_yrs_female)), 
@@ -44,12 +45,13 @@ GP_age_dist_wide <- GP_age_dist %>%
          female45_54 = rowSums(select(., x45_49_yrs_female:x50_54_yrs_female)), 
          female55_64 = rowSums(select(., x55_59_yrs_female:x60_64_yrs_female)), 
          female65_74 = rowSums(select(., x65_69_yrs_female:x70_74_yrs_female)), 
-         female75plus = rowSums(select(., x75_79_yrs_female:x95_yrs_female)))
+         female75 = rowSums(select(., x75_79_yrs_female)), 
+         female80plus = rowSums(select(., x80_84_yrs_female:x95_yrs_female)))
 
 GP_age_dist_cl <- GP_age_dist_wide %>%
-  subset(., select = c(area_code, area_name, male0_15:female75plus)) %>%
-  mutate(total_male = male0_15 + male16_24 + male25_34 + male35_44 + male45_54 + male55_64 + male65_74 + male75plus, 
-         total_female = female0_15 + female16_24 + female25_34 + female35_44 + female45_54 + female55_64 + female65_74 + female75plus, 
+  subset(., select = c(area_code, area_name, male0_15:female80plus)) %>%
+  mutate(total_male = male0_15 + male16_24 + male25_34 + male35_44 + male45_54 + male55_64 + male65_74 + male75 + male80plus, 
+         total_female = female0_15 + female16_24 + female25_34 + female35_44 + female45_54 + female55_64 + female65_74 + female75 + female80plus, 
          gp_pop = total_male + total_female) %>%
   # change the total number of males and females into percentages
   mutate(male0_15_perc = male0_15/total_male, 
@@ -59,7 +61,8 @@ GP_age_dist_cl <- GP_age_dist_wide %>%
          male45_54_perc = male45_54/total_male, 
          male55_64_perc = male55_64/total_male, 
          male65_74_perc = male65_74/total_male, 
-         male75plus_perc = male75plus/total_male, 
+         male75_79_perc = male75/total_male, 
+         male80plus_perc = male80plus/total_male,
          female0_15_perc = female0_15/total_female, 
          female16_24_perc = female16_24/total_female, 
          female25_34_perc = female25_34/total_female, 
@@ -67,7 +70,8 @@ GP_age_dist_cl <- GP_age_dist_wide %>%
          female45_54_perc = female45_54/total_female, 
          female55_64_perc = female55_64/total_female, 
          female65_74_perc = female65_74/total_female, 
-         female75plus_perc = female75plus/total_female)
+         female75_79_perc = female75/total_female, 
+         female80plus_perc = female80plus/total_female)
 
 # calculating the expected hypertension prevalence by age group
 GP_age_dist_cl <- GP_age_dist_cl %>%
@@ -77,23 +81,41 @@ GP_age_dist_cl <- GP_age_dist_cl %>%
          exp_hyp_45_54_male = male45_54_perc*0.10, 
          exp_hyp_55_64_male = male55_64_perc*0.26, 
          exp_hyp_65_74_male = male65_74_perc*0.38,
-         exp_hyp_75plus_male = male75plus_perc*0.53,
+         exp_hyp_75_79_male = male75_79_perc*0.53,
+         exp_hyp_80plus_male = male80plus_perc*0.53,
          exp_hyp_16_24_female = female16_24_perc*0.00, 
          exp_hyp_25_34_female = female25_34_perc*0.01, 
          exp_hyp_35_44_female = female35_44_perc*0.02, 
          exp_hyp_45_54_female = female45_54_perc*0.09, 
          exp_hyp_55_64_female = female55_64_perc*0.19, 
          exp_hyp_65_74_female = female65_74_perc*0.32,
-         exp_hyp_75plus_female = female75plus_perc*0.46)
+         exp_hyp_75_79_female = female75_79_perc*0.46, 
+         exp_hyp_80plus_female = female80plus_perc*0.46)
 
 # calculating the total expected hypertension by GP 
 GP_age_dist_cl <- GP_age_dist_cl %>%
   mutate(exp_hyp_male = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
-           exp_hyp_55_64_male + exp_hyp_65_74_male + exp_hyp_75plus_male, 
+           exp_hyp_55_64_male + exp_hyp_65_74_male + exp_hyp_75_79_male + exp_hyp_80plus_male, 
+         exp_u79_hyp_male = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + 
+           exp_hyp_45_54_male +  exp_hyp_55_64_male + exp_hyp_65_74_male + exp_hyp_75_79_male,
          exp_hyp_female = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
-           exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75plus_female, 
+           exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75_79_female + exp_hyp_80plus_female, 
+         exp_u79_hyp_female = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + 
+           exp_hyp_45_54_female + exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75_79_female,
          perc_male = total_male/gp_pop, 
-         perc_female = total_female/gp_pop)
+         perc_female = total_female/gp_pop, 
+         male_u79_perc = (total_male-male80plus)/gp_pop, 
+         male_o80_perc = male80plus/gp_pop, 
+         female_u79_perc = (total_female-female80plus)/gp_pop, 
+         female_o80_perc = female80plus/gp_pop)
+
+lsoa_age_dist <- read_csv("~/Hypertension/Population Age Distributions/lsoa_all_age_estimates.csv", skip = 4) %>%
+  clean_names()
+
+lsoa_age_dist_cl <- lsoa_age_dist %>%
+  mutate(under79_pop = rowSums(select(., x0:x79)),
+         over80_pop = rowSums(select(., x80:x90))) %>%
+  select(-starts_with('x'))
 
 # Loading in IMD data 
 GP_imd <- read_csv("~/Hypertension/GP Data/indicators_GP_data.csv") %>%
@@ -115,7 +137,7 @@ LSOA_imd_cl <- LSOA_imd %>%
                       health_deprivation_and_disability_score, crime_score, living_environment_score, 
                       barriers_to_housing_and_services_score))
 
-# Loading in LSOA data 
+# Loading in LSOA data from July 2022
 GP_lsoa_dist <- read_csv("~/Hypertension/GP Data/gp-reg-pat-prac-lsoa-all.csv") %>%
   clean_names() %>%
   subset(., select = c(practice_code, practice_name, lsoa_code, number_of_patients))
@@ -173,7 +195,8 @@ lsoa_hyper_prev <- merge(GP_lsoa_age_data, Hyper21_22_cl, by = 'practice_code') 
   # Create new column for the percentage of patients a GP serves in each LSOA 
   mutate(gp_coverage = (number_of_patients/lsoa_pop), 
          gp_share = (number_of_patients/list_size_21_22)*register_21_22, 
-         exp_hyp = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100)
+         exp_hyp = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100, 
+         exp_u79_hyp = (exp_u79_hyp_male*male_u79_perc + exp_u79_hyp_female*female_u79_perc)*100)
 
 ### Hypertension Analysis ####
 # checking the mean and median of hypertension prevalence by GP 
@@ -184,10 +207,11 @@ median(lsoa_hyper_prev$prevalence_percent_21_22) # 13.03%
 lsoa_grouped <- lsoa_hyper_prev %>%
   group_by(lsoa_code) %>%
   summarise(obs_hyper_prev = sum(gp_coverage*prevalence_percent_21_22),
+            obs_u79_prev = sum(gp_coverage*under79_prev)*100,
+            obs_o80_prev = sum(gp_coverage*over80_prev)*100,
             exp_hyper_prev = sum(exp_hyp*gp_coverage),
+            exp_u79_prev = sum(gp_coverage*exp_u79_hyp), 
             lsoa_pop = mean(lsoa_pop), 
-            list_size_21_22 = sum(list_size_21_22), 
-            register_21_22 = sum(register_21_22),
             u79_achievement = sum(gp_coverage*under79_achievement_net_exceptions_21_22), 
             u79_intervention = sum(gp_coverage*under79_percent_receiving_intervention_21_22), 
             o80_achievement = sum(gp_coverage*over80_achievement_net_exceptions_21_22), 
@@ -196,7 +220,9 @@ lsoa_grouped <- lsoa_hyper_prev %>%
 # merging with expected hypertension rates for males and females 
 lsoa_age_adj <- lsoa_grouped %>%
   mutate(obs_over_exp = obs_hyper_prev/exp_hyper_prev,
-         age_std_prev = obs_hyper_prev*obs_over_exp)
+         u79_obs_over_exp = obs_u79_prev/exp_u79_prev,
+         age_std_prev = obs_hyper_prev*obs_over_exp, 
+         age_std_u79_prev = obs_u79_prev*u79_obs_over_exp)
 
 # Merging at CCG 
 ccg_grouped <- merge(lsoa_age_adj, lsoa_ccg_la, by.x = 'lsoa_code', by.y = 'LSOA11CD') 
@@ -1189,14 +1215,18 @@ northwest_imd <- tm_shape(nw_imd_shp) +
 tmap_arrange(nw_age_std_hyp, nw_ratio, northwest_imd)
 
 #### For Godspower #### 
+lsoa_hyper_abs_age <- merge(lsoa_age_adj, lsoa_age_dist_cl, by = 'lsoa_code') %>%
+  mutate(u79_total = round(age_std_u79_prev/100*under79_pop, digits = 0),
+         o80_total = round(obs_o80_prev/100*over80_pop, digits = 0))
+
 ccg_data <- merge(ccg_agg, ccg_pop, by.x = 'CCG21CD', by.y = 'ccg_code')
-ccg_data <- merge(ccg_data, ccg_age_dist_21, by.x = 'CCG21CDH', by.y = 'ccg_code') 
+ccg_data <- merge(ccg_data, ccg_age_dist_21, by.x = 'CCG21CDH', by.y = 'ccg_code') %>%
+  mutate(abs_hypertension = (age_std_prev_21_22/100)*all_ages)
 
 ccg_data_cl <- ccg_data %>%
   subset(select = -c(36:53))
 
 regional_hyper <- ccg_data %>%
-  mutate(abs_hypertension = (age_std_prev_21_22/100)*all_ages) %>%
   group_by(nhser21_name) %>%
   summarise(hypertension_prevalence = mean(avg_prevalence_21_22), 
             age_std_prev = mean(age_std_prev_21_22), 
@@ -1212,13 +1242,13 @@ regional_hyper <- ccg_data %>%
             male55_64 = sum(male55_64), 
             male65_74 = sum(male65_74), 
             male75plus = sum(male75plus), 
-            male_prev16_24 = mean(exp_hyp_16_24_male), 
-            male_prev25_34 = mean(exp_hyp_25_34_male), 
-            male_prev35_44 = mean(exp_hyp_35_44_male), 
-            male_prev45_54 = mean(exp_hyp_45_54_male), 
-            male_prev55_64 = mean(exp_hyp_55_64_male), 
-            male_prev65_74 = mean(exp_hyp_65_74_male), 
-            male_prev75plus = mean(exp_hyp_75plus_male), 
+            male_prev16_24 = mean(exp_hyp_16_24_male*male16_24_perc*100), 
+            male_prev25_34 = mean(exp_hyp_25_34_male*male25_34_perc*100), 
+            male_prev35_44 = mean(exp_hyp_35_44_male*male35_44_perc*100), 
+            male_prev45_54 = mean(exp_hyp_45_54_male*male45_54_perc*100), 
+            male_prev55_64 = mean(exp_hyp_55_64_male*male55_64_perc*100), 
+            male_prev65_74 = mean(exp_hyp_65_74_male*male65_74_perc*100), 
+            male_prev75plus = mean(exp_hyp_75plus_male*male75plus_perc*100), 
             female0_15 = sum(female0_15), 
             female16_24 = sum(female16_24), 
             female25_34 = sum(female25_34), 
@@ -1227,13 +1257,13 @@ regional_hyper <- ccg_data %>%
             female55_64 = sum(female55_64), 
             female65_74 = sum(female65_74), 
             female75plus = sum(female75plus), 
-            female_prev16_24 = mean(exp_hyp_16_24_female), 
-            female_prev25_34 = mean(exp_hyp_25_34_female), 
-            female_prev35_44 = mean(exp_hyp_35_44_female), 
-            female_prev45_54 = mean(exp_hyp_45_54_female), 
-            female_prev55_64 = mean(exp_hyp_55_64_female), 
-            female_prev65_74 = mean(exp_hyp_65_74_female), 
-            female_prev75plus = mean(exp_hyp_75plus_female))
+            female_prev16_24 = mean(exp_hyp_16_24_female*female16_24_perc*100), 
+            female_prev25_34 = mean(exp_hyp_25_34_female*female25_34_perc*100), 
+            female_prev35_44 = mean(exp_hyp_35_44_female*female35_44_perc*100), 
+            female_prev45_54 = mean(exp_hyp_45_54_female*female45_54_perc*100), 
+            female_prev55_64 = mean(exp_hyp_55_64_female*female55_64_perc*100), 
+            female_prev65_74 = mean(exp_hyp_65_74_female*female65_74_perc*100), 
+            female_prev75plus = mean(exp_hyp_75plus_female*female75plus_perc*100))
 
 #### Objective 2 ####
 # Comparing QOF Prevalence to HSE Prevalence by GP 
@@ -1257,7 +1287,7 @@ undiagnosed_hyp_prev <- hse_qof_comp %>%
   rename(hse_prevalence = percent, 
          practice_code = code)
 
-# finding absoluate prevalence at GP level 
+# finding absolute prevalence at GP level 
 abs_gp_hyper <- merge(undiagnosed_hyp_prev, GP_age_dist_cl, by.x = 'practice_code', by.y = 'area_code') %>%
   # selecting variables of interest 
   select(practice_code, practice_name, gp_pop, hse_prevalence, prevalence_percent_21_22, undiagnosed_hyp,
@@ -1285,7 +1315,15 @@ lsoa_pop <- read_csv("~/Hypertension/Population Age Distributions/lsoa_all_age_e
   select(lsoa_code, lsoa_name, all_ages, la_code_2021_boundaries, la_name_2021_boundaries)
 
 abs_undiagnosed <- merge(lsoa_undiagnosed, lsoa_pop, by = 'lsoa_code') %>%
-  mutate(tot_undiagnosed = (undiagnosed_prevalence/100)*all_ages)
+  mutate(tot_undiagnosed = round((undiagnosed_prevalence/100)*all_ages, digits = 0))
+
+regional_abs_undiagnosed <- merge(abs_undiagnosed, lsoa_ccg_region, by.x = 'lsoa_code', by.y = 'geo_code') %>%
+  group_by(NHSER21NM, NHSER21CD) %>%
+  summarise(hypertension_prev = mean(observed_prevalence),
+            hse_prev = mean(hse_prevalence),
+            undiagnosed_prev = mean(undiagnosed_prevalence),
+            tot_undiagnosed = sum(tot_undiagnosed))
+
 
 #### Objective 3 ####
 #### Loading in QOF data from 2014-15 to 2019-20 ####
@@ -2366,36 +2404,38 @@ QOF_prev_cl <- QOF_prev_long %>%
          exp_prevalence = expprev, 
          obs_prevalence = obsprev) %>%
   mutate_at('year', as.numeric) %>%
-  mutate(threshold_change = case_when(year >= 20 ~ 1, T ~ 0), 
+  mutate(covid = case_when(year >= 21 ~ 1, T ~ 0), 
          year = year - 15) # creating dummy variable for the covid years 
 
 # Subsetting for the First Four Years
-QOF_prev_14_18 <- QOF_prev_cl %>%
-  filter(., year <=  4)
+QOF_prev_14_19 <- QOF_prev_cl %>%
+  filter(., year <=  5)
 
 # performing ITS 
-itsa <- lm(age_std_prevalence ~ year + threshold_change, data = QOF_prev_cl)
+itsa <- lm(age_std_prevalence ~ year + covid + year*covid, data = QOF_prev_cl)
 summary(itsa)
 
 # Finding what the average yearly increase in prevalence is from 2014-15 to 2017-18 
-fit_14_18 <- lm(age_std_prevalence ~ year, data = QOF_prev_14_18)
-summary(fit_14_18)
+fit_14_19 <- lm(age_std_prevalence ~ year, data = QOF_prev_14_19)
+summary(fit_14_19)
 
 # Fitting the yearly increase (0.11226) to the 2019 data to account for the change in prevalence 
-QOF_prev_19_22 <- QOF_prev %>%
+# When shifted to include 2019 (as the threshold change doesn't impact prevalance), coefficient = 0.12606
+QOF_prev_20_22 <- QOF_prev %>%
   select(CCG21CD, agestdprev_20, agestdprev_21, agestdprev_22)
 
 # Calculating the expected prevalence 
-QOF_prev_19_22 <- QOF_prev_19_22 %>%
-  mutate(exp_age_std_prev_21 = agestdprev_20 + 0.11226, 
-         exp_age_std_prev_22 = agestdprev_20 + 0.11226*2, 
+QOF_prev_20_22 <- QOF_prev_20_22 %>%
+  mutate(exp_age_std_prev_21 = agestdprev_20 + 0.12606, 
+         exp_age_std_prev_22 = agestdprev_20 + 0.12606*2, 
          # Now calculating the difference between the expected change and obs change to get the covid effect
-         age_std_prev_diff_21 = case_when(agestdprev_21 - exp_age_std_prev_21 <= 0 ~ age_std_prev_diff_21, T ~ 0),
+         age_std_prev_diff_21 = case_when(agestdprev_21 - exp_age_std_prev_21 <= 0 ~ agestdprev_21 - exp_age_std_prev_21,
+                                          T ~ 0),
          age_std_prev_diff_22 = agestdprev_22 - exp_age_std_prev_22)
   
 
 # plotting differences
-prev_diff_shp <- merge(Eng_CCG, QOF_prev_19_22, by = 'CCG21CD') 
+prev_diff_shp <- merge(Eng_CCG, QOF_prev_20_22, by = 'CCG21CD') 
 
 # 2021 difference
 tm_shape(prev_diff_shp) + 
@@ -2444,7 +2484,6 @@ ggplot(abs_hyper_long, aes(x = nhser21_name, y = undiagnosed_totals, fill = year
 regional_totals <- abs_hyper_long %>%
   group_by(nhser21_name, year) %>%
   summarise(undiagnosed_total = round(sum(undiagnosed_totals), 0))
-
 
 
 
