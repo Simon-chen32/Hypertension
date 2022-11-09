@@ -20,58 +20,56 @@ London_2011 <- st_read("~/Hypertension/LSOA Shapefiles/statistical-gis-boundarie
   subset(., select = -c(RGN11CD:AVHHOLDSZ))
 
 # Loading in GP Data
-GP_age_dist <- read_csv("~/Hypertension/GP Data/PopulationAgeDistribution.csv") %>%
+GP_age_dist <- read_csv("~/Hypertension/Population Age Distributions/gp-reg-pat-prac-quin-age-sep-22.csv") %>%
   clean_names()
 
 #### Age Standardisation ####
 GP_age_dist_wide <- GP_age_dist %>% 
-  pivot_wider(names_from = c(age, sex), 
-              values_from = value) %>%
+  filter(org_type == 'GP') %>%
+  pivot_wider(names_from = c(age_group_5, sex), 
+              values_from = number_of_patients) %>%
   clean_names() %>%
   # summing to total number of males and females in each age category 
-  mutate(male0_15 = rowSums(select(., x0_4_yrs_male:x10_14_yrs_male)), 
-         male16_24 = rowSums(select(., x15_19_yrs_male:x20_24_yrs_male)), 
-         male25_34 = rowSums(select(., x25_29_yrs_male:x30_34_yrs_male)), 
-         male35_44 = rowSums(select(., x35_39_yrs_male:x40_44_yrs_male)), 
-         male45_54 = rowSums(select(., x45_49_yrs_male:x50_54_yrs_male)), 
-         male55_64 = rowSums(select(., x55_59_yrs_male:x60_64_yrs_male)), 
-         male65_74 = rowSums(select(., x65_69_yrs_male:x70_74_yrs_male)), 
-         male75 = rowSums(select(., x75_79_yrs_male)), 
-         male80plus =rowSums(select(., x80_84_yrs_male:x95_yrs_male)), 
-         female0_15 = rowSums(select(., x0_4_yrs_female:x10_14_yrs_female)), 
-         female16_24 = rowSums(select(., x15_19_yrs_female:x20_24_yrs_female)), 
-         female25_34 = rowSums(select(., x25_29_yrs_female:x30_34_yrs_female)), 
-         female35_44 = rowSums(select(., x35_39_yrs_female:x40_44_yrs_female)), 
-         female45_54 = rowSums(select(., x45_49_yrs_female:x50_54_yrs_female)), 
-         female55_64 = rowSums(select(., x55_59_yrs_female:x60_64_yrs_female)), 
-         female65_74 = rowSums(select(., x65_69_yrs_female:x70_74_yrs_female)), 
-         female75 = rowSums(select(., x75_79_yrs_female)), 
-         female80plus = rowSums(select(., x80_84_yrs_female:x95_yrs_female)))
+  mutate(male0_15 = rowSums(select(., x0_4_male:x10_14_male)), 
+         male16_24 = rowSums(select(., x15_19_male:x20_24_male)), 
+         male25_34 = rowSums(select(., x25_29_male:x30_34_male)), 
+         male35_44 = rowSums(select(., x35_39_male:x40_44_male)), 
+         male45_54 = rowSums(select(., x45_49_male:x50_54_male)), 
+         male55_64 = rowSums(select(., x55_59_male:x60_64_male)), 
+         male65_74 = rowSums(select(., x65_69_male:x70_74_male)), 
+         male75 = rowSums(select(., x75_79_male)), 
+         male80plus =rowSums(select(., x80_84_male:x95_male)), 
+         female0_15 = rowSums(select(., x0_4_female:x10_14_female)), 
+         female16_24 = rowSums(select(., x15_19_female:x20_24_female)), 
+         female25_34 = rowSums(select(., x25_29_female:x30_34_female)), 
+         female35_44 = rowSums(select(., x35_39_female:x40_44_female)), 
+         female45_54 = rowSums(select(., x45_49_female:x50_54_female)), 
+         female55_64 = rowSums(select(., x55_59_female:x60_64_female)), 
+         female65_74 = rowSums(select(., x65_69_female:x70_74_female)), 
+         female75 = rowSums(select(., x75_79_female)), 
+         female80plus = rowSums(select(., x80_84_female:x95_female)))
 
 GP_age_dist_cl <- GP_age_dist_wide %>%
-  subset(., select = c(area_code, area_name, male0_15:female80plus)) %>%
-  mutate(total_male = male0_15 + male16_24 + male25_34 + male35_44 + male45_54 + male55_64 + male65_74 + male75 + male80plus, 
-         total_female = female0_15 + female16_24 + female25_34 + female35_44 + female45_54 + female55_64 + female65_74 + female75 + female80plus, 
-         gp_pop = total_male + total_female) %>%
+  select(org_code, all_female, all_male, all_all, male0_15:female80plus) %>%
   # change the total number of males and females into percentages
-  mutate(male0_15_perc = male0_15/total_male, 
-         male16_24_perc = male16_24/total_male, 
-         male25_34_perc = male25_34/total_male, 
-         male35_44_perc = male35_44/total_male, 
-         male45_54_perc = male45_54/total_male, 
-         male55_64_perc = male55_64/total_male, 
-         male65_74_perc = male65_74/total_male, 
-         male75_79_perc = male75/total_male, 
-         male80plus_perc = male80plus/total_male,
-         female0_15_perc = female0_15/total_female, 
-         female16_24_perc = female16_24/total_female, 
-         female25_34_perc = female25_34/total_female, 
-         female35_44_perc = female35_44/total_female, 
-         female45_54_perc = female45_54/total_female, 
-         female55_64_perc = female55_64/total_female, 
-         female65_74_perc = female65_74/total_female, 
-         female75_79_perc = female75/total_female, 
-         female80plus_perc = female80plus/total_female)
+  mutate(male0_15_perc = male0_15/all_male, 
+         male16_24_perc = male16_24/all_male, 
+         male25_34_perc = male25_34/all_male, 
+         male35_44_perc = male35_44/all_male, 
+         male45_54_perc = male45_54/all_male, 
+         male55_64_perc = male55_64/all_male, 
+         male65_74_perc = male65_74/all_male, 
+         male75_79_perc = male75/all_male, 
+         male80plus_perc = male80plus/all_male,
+         female0_15_perc = female0_15/all_female, 
+         female16_24_perc = female16_24/all_female, 
+         female25_34_perc = female25_34/all_female, 
+         female35_44_perc = female35_44/all_female, 
+         female45_54_perc = female45_54/all_female, 
+         female55_64_perc = female55_64/all_female, 
+         female65_74_perc = female65_74/all_female, 
+         female75_79_perc = female75/all_female, 
+         female80plus_perc = female80plus/all_female)
 
 # calculating the expected hypertension prevalence by age group
 GP_age_dist_cl <- GP_age_dist_cl %>%
@@ -102,13 +100,14 @@ GP_age_dist_cl <- GP_age_dist_cl %>%
            exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75_79_female + exp_hyp_80plus_female, 
          exp_u79_hyp_female = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + 
            exp_hyp_45_54_female + exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75_79_female,
-         perc_male = total_male/gp_pop, 
-         perc_female = total_female/gp_pop, 
-         male_u79_perc = (total_male-male80plus)/gp_pop, 
-         male_o80_perc = male80plus/gp_pop, 
-         female_u79_perc = (total_female-female80plus)/gp_pop, 
-         female_o80_perc = female80plus/gp_pop)
+         perc_male = all_male/all_all, 
+         perc_female = all_female/all_all, 
+         male_u79_perc = (all_male-male80plus)/all_all, 
+         male_o80_perc = male80plus/all_all, 
+         female_u79_perc = (all_female-female80plus)/all_all, 
+         female_o80_perc = female80plus/all_all)
 
+#### For GP ####
 lsoa_age_dist <- read_csv("~/Hypertension/Population Age Distributions/lsoa_all_age_estimates.csv", skip = 4) %>%
   clean_names()
 
@@ -116,6 +115,8 @@ lsoa_age_dist_cl <- lsoa_age_dist %>%
   mutate(under79_pop = rowSums(select(., x0:x79)),
          over80_pop = rowSums(select(., x80:x90))) %>%
   select(-starts_with('x'))
+
+#### Continue Loading Data #####
 
 # Loading in IMD data 
 GP_imd <- read_csv("~/Hypertension/GP Data/indicators_GP_data.csv") %>%
@@ -146,9 +147,8 @@ GP_lsoa_data <- GP_lsoa_dist %>%
   group_by(lsoa_code) %>%
   summarise(lsoa_pop = sum(number_of_patients), 
             practice_code = practice_code, 
-            number_of_patients = number_of_patients)
-
-GP_lsoa_age_data <- merge(GP_lsoa_data, GP_age_dist_cl, by.x = 'practice_code', by.y = 'area_code') 
+            number_of_patients = number_of_patients) %>%
+  filter(grepl("E", lsoa_code))
 
 # Loading in some files for aggregating geography upwards
 lsoa_ccg_la <- read_csv("LSOA_to_CCG_to_LAD_(April_2021)_Lookup_in_England.csv")
@@ -191,7 +191,9 @@ Hyper21_22_cl <- Hyper21_22 %>%
 Hyper21_22_cl$over80_achievement_net_exceptions_21_22 <- as.numeric(Hyper21_22_cl$over80_achievement_net_exceptions_21_22)
 Hyper21_22_cl$over80_percent_receiving_intervention_21_22 <- as.numeric(Hyper21_22_cl$over80_percent_receiving_intervention_21_22)
 
-lsoa_hyper_prev <- merge(GP_lsoa_age_data, Hyper21_22_cl, by = 'practice_code') %>%
+GP_lsoa_age_data <- merge(GP_age_dist_cl, GP_lsoa_data, by.x = 'org_code', by.y = 'practice_code')
+
+lsoa_hyper_prev <- merge(GP_lsoa_age_data, Hyper21_22_cl, by.x = 'org_code', by.y = 'practice_code') %>%
   # Create new column for the percentage of patients a GP serves in each LSOA 
   mutate(gp_coverage = (number_of_patients/lsoa_pop), 
          gp_share = (number_of_patients/list_size_21_22)*register_21_22, 
@@ -228,8 +230,11 @@ lsoa_age_adj <- lsoa_grouped %>%
 ccg_grouped <- merge(lsoa_age_adj, lsoa_ccg_la, by.x = 'lsoa_code', by.y = 'LSOA11CD') 
 
 # comparing mean and median in new df to data reported by GPs 
-mean(lsoa_grouped$obs_hyper_prev) # 14.31%
-median(lsoa_grouped$obs_hyper_prev) #14.57%
+mean(lsoa_grouped$obs_hyper_prev) # 14.30%
+median(lsoa_grouped$obs_hyper_prev) #14.55%
+
+# Age Standardised Dataframe 
+mean(lsoa_age_adj$age_std_prev) # 15.22
 
 #### Plotting ####
 # Creating a Shapefile to plot prevalence by LSOA
@@ -271,14 +276,13 @@ ccg_agg <- ccg_grouped %>%
             exp_hyp_21_22 = mean(exp_hyper_prev), 
             obs_over_exp_22 = mean(obs_over_exp), 
             age_std_prev_21_22 = mean(age_std_prev),
-            tot_list_size_21_22 = sum(list_size_21_22), 
-            tot_register_21_22 = sum(register_21_22),
+            lsoa_pop_21_22 = sum(lsoa_pop),
             avg_u79_achievement_21_22 = mean(u79_achievement), 
             avg_u79_intervention_21_22 = mean(u79_intervention), 
             avg_o80_achievement_21_22 = mean(o80_achievement), 
             avg_o80_intervention_21_22 = mean(o80_intervention)) %>%
   # including variable to indicate if above or below national average
-  mutate(above_average = case_when(age_std_prev_21_22 > 17.10 ~ 1, 
+  mutate(above_average = case_when(age_std_prev_21_22 > 15.23 ~ 1, 
                                    T ~ 0))
 
 ccg_agg_shp <- merge(Eng_CCG, ccg_agg, by = c('CCG21CD', 'CCG21NM'))
@@ -1277,29 +1281,27 @@ hse_hyper_prev <- merge(GP_age_dist_cl, hse_hyp_prev, by.x = 'area_code', by.y =
   mutate(hse_exp_hyp = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100)
 
 # merging to QOF data from 21/22
-hse_qof_comp <- merge(hse_hyp_prev, Hyper21_22, by.x = 'code', by.y = 'practice_code')
+hse_qof_comp <- merge(hse_hyp_prev, Hyper21_22_cl, by.x = 'code', by.y = 'practice_code', all.y = TRUE)
 
 # finding difference in crude prevalence 
 undiagnosed_hyp_prev <- hse_qof_comp %>%
   mutate(undiagnosed_hyp = percent - prevalence_percent_21_22) %>%
-  select(code, practice_name, percent, prevalence_percent_21_22, sub_icb_loc_ods_code, sub_icb_loc_ons_code, 
-         sub_icb_loc_name, undiagnosed_hyp) %>%
   rename(hse_prevalence = percent, 
          practice_code = code)
 
 # finding absolute prevalence at GP level 
-abs_gp_hyper <- merge(undiagnosed_hyp_prev, GP_age_dist_cl, by.x = 'practice_code', by.y = 'area_code') %>%
+abs_gp_hyper <- merge(undiagnosed_hyp_prev, GP_lsoa_data, by = 'practice_code', all.y = TRUE) %>%
   # selecting variables of interest 
-  select(practice_code, practice_name, gp_pop, hse_prevalence, prevalence_percent_21_22, undiagnosed_hyp,
+  select(practice_code, practice_name, number_of_patients, hse_prevalence, prevalence_percent_21_22, undiagnosed_hyp,
          sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
   # Calculating total undiagnosed by GP 
-  mutate(undiagnosed_totals = (undiagnosed_hyp/100)*gp_pop)
+  mutate(undiagnosed_totals = (undiagnosed_hyp/100)*number_of_patients)
 
 sub_icb_abs <- abs_gp_hyper %>%
   group_by(sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
-  summarise(undiagnosed_hypertension = round(sum(undiagnosed_totals), digits = 0), 
-            avg_undiagnosed_percent = mean(undiagnosed_hyp),
-            sub_icb_pop = sum(gp_pop))
+  summarise(undiagnosed_hypertension = round(sum(undiagnosed_totals, na.rm = TRUE),digits = 0), 
+            avg_undiagnosed_percent = mean(undiagnosed_hyp, na.rm = TRUE),
+            sub_icb_pop = sum(number_of_patients))
 
 regional_abs_undiagnosed <- merge(sub_icb_abs, ccg_region, by.x = 'sub_icb_loc_ods_code', by.y = 'CCG21CDH') %>%
   group_by(NHSER21NM, NHSER21CD) %>%
@@ -2259,7 +2261,28 @@ QOF_17$ccg_code[QOF_17$ccg_code == "00W"] <- "14L"
 QOF_17$ccg_code[QOF_17$ccg_code == "01M"] <- "14L"
 QOF_17$ccg_code[QOF_17$ccg_code == "01N"] <- "14L"
 
-QOF_18 <- merge(QOF_17, hyper_prev_17_18, by = 'ccg_code', all = TRUE)
+QOF17_grouped <- QOF_17 %>%
+  group_by(ccg_code) %>%
+  summarise(listsize_15 = sum(tot_list_size_14_15, na.rm = TRUE), 
+            register_15 = sum(tot_register_14_15, na.rm = TRUE), 
+            obsprev_15 = mean(avg_prevalence_14_15, na.rm = TRUE), 
+            expprev_15 = mean(exp_hyp_14_15, na.rm = TRUE),
+            agestdprev_15 = mean(age_std_prev_14_15, na.rm = TRUE),
+            obs_exp_ratio_15 = mean(obs_over_exp_15, na.rm = TRUE),
+            listsize_16 = sum(tot_list_size_15_16, na.rm = TRUE), 
+            register_16 = sum(tot_register_15_16, na.rm = TRUE), 
+            obsprev_16 = mean(avg_prevalence_15_16, na.rm = TRUE), 
+            expprev_16 = mean(exp_hyp_15_16, na.rm = TRUE),
+            agestdprev_16 = mean(age_std_prev_15_16, na.rm = TRUE),
+            obs_exp_ratio_16 = mean(obs_over_exp_16, na.rm = TRUE),
+            listsize_17 = sum(tot_list_size_16_17, na.rm = TRUE), 
+            register_17 = sum(tot_register_16_17, na.rm = TRUE), 
+            obsprev_17 = mean(avg_prevalence_16_17, na.rm = TRUE), 
+            expprev_17 = mean(exp_hyp_16_17, na.rm = TRUE),
+            agestdprev_17 = mean(age_std_prev_16_17, na.rm = TRUE),
+            obs_exp_ratio_17 = mean(obs_over_exp_17, na.rm = TRUE))
+
+QOF_18 <- merge(QOF17_grouped, hyper_prev_17_18, by = 'ccg_code', all = TRUE)
 # Changing more CCG Codes - 14Y 
 # Note: 14Y does not appear until 2018/19, as Buckinghamshire CCG data is excluded for the 2017/18 year due to small sample size 
 #       and participation in an alternative payment scheme 
@@ -2288,7 +2311,35 @@ QOF_18$ccg_code[QOF_18$ccg_code == "02V"] <- "15F"
 QOF_18$ccg_code[QOF_18$ccg_code == "03C"] <- "15F"
 QOF_18$ccg_code[QOF_18$ccg_code == "03G"] <- "15F"
 
-QOF_19 <- merge(QOF_18, hyper_prev_18_19, by = 'ccg_code', all = TRUE)
+QOF18_grouped <- QOF_18 %>%
+  group_by(ccg_code) %>%
+  summarise(listsize_15 = sum(listsize_15, na.rm = TRUE), 
+            register_15 = sum(register_15, na.rm = TRUE), 
+            obsprev_15 = mean(obsprev_15, na.rm = TRUE), 
+            expprev_15 = mean(expprev_15, na.rm = TRUE),
+            agestdprev_15 = mean(agestdprev_15, na.rm = TRUE),
+            obs_exp_ratio_15 = mean(obs_exp_ratio_15, na.rm = TRUE),
+            listsize_16 = sum(listsize_16, na.rm = TRUE), 
+            register_16 = sum(register_16, na.rm = TRUE), 
+            obsprev_16 = mean(obsprev_16, na.rm = TRUE), 
+            expprev_16 = mean(expprev_16, na.rm = TRUE),
+            agestdprev_16 = mean(agestdprev_16, na.rm = TRUE),
+            obs_exp_ratio_16 = mean(obs_exp_ratio_16, na.rm = TRUE),
+            listsize_17 = sum(listsize_17, na.rm = TRUE), 
+            register_17 = sum(register_17, na.rm = TRUE), 
+            obsprev_17 = mean(obsprev_17, na.rm = TRUE), 
+            expprev_17 = mean(expprev_17, na.rm = TRUE),
+            agestdprev_17 = mean(agestdprev_17, na.rm = TRUE),
+            obs_exp_ratio_17 = mean(obs_exp_ratio_17, na.rm = TRUE),
+            listsize_18 = sum(tot_list_size_17_18, na.rm = TRUE), 
+            register_18 = sum(tot_register_17_18, na.rm = TRUE), 
+            obsprev_18 = mean(avg_prevalence_17_18, na.rm = TRUE), 
+            expprev_18 = mean(exp_hyp_17_18, na.rm = TRUE),
+            agestdprev_18 = mean(age_std_prev_17_18, na.rm = TRUE),
+            obs_exp_ratio_18 = mean(obs_over_exp_18, na.rm = TRUE))
+  
+
+QOF_19 <- merge(QOF18_grouped, hyper_prev_18_19, by = 'ccg_code', all = TRUE)
 # 15M
 QOF_19$ccg_code[QOF_19$ccg_code == "03X"] <- "15M"
 QOF_19$ccg_code[QOF_19$ccg_code == "03Y"] <- "15M"
@@ -2298,7 +2349,40 @@ QOF_19$ccg_code[QOF_19$ccg_code == "04R"] <- "15M"
 QOF_19$ccg_code[QOF_19$ccg_code == "99P"] <- "15N"
 QOF_19$ccg_code[QOF_19$ccg_code == "99Q"] <- "15N"
 
-QOF_19_data <- merge(QOF_19, ccg_2020_codes, by.x = 'ccg_code', by.y = 'old_code', all = TRUE)
+QOF19_grouped <- QOF_19 %>%
+  group_by(ccg_code) %>%
+  summarise(listsize_15 = sum(listsize_15, na.rm = TRUE), 
+            register_15 = sum(register_15, na.rm = TRUE), 
+            obsprev_15 = mean(obsprev_15, na.rm = TRUE), 
+            expprev_15 = mean(expprev_15, na.rm = TRUE),
+            agestdprev_15 = mean(agestdprev_15, na.rm = TRUE),
+            obs_exp_ratio_15 = mean(obs_exp_ratio_15, na.rm = TRUE),
+            listsize_16 = sum(listsize_16, na.rm = TRUE), 
+            register_16 = sum(register_16, na.rm = TRUE), 
+            obsprev_16 = mean(obsprev_16, na.rm = TRUE), 
+            expprev_16 = mean(expprev_16, na.rm = TRUE),
+            agestdprev_16 = mean(agestdprev_16, na.rm = TRUE),
+            obs_exp_ratio_16 = mean(obs_exp_ratio_16, na.rm = TRUE),
+            listsize_17 = sum(listsize_17, na.rm = TRUE), 
+            register_17 = sum(register_17, na.rm = TRUE), 
+            obsprev_17 = mean(obsprev_17, na.rm = TRUE), 
+            expprev_17 = mean(expprev_17, na.rm = TRUE),
+            agestdprev_17 = mean(agestdprev_17, na.rm = TRUE),
+            obs_exp_ratio_17 = mean(obs_exp_ratio_17, na.rm = TRUE),
+            listsize_18 = sum(listsize_18, na.rm = TRUE), 
+            register_18 = sum(register_18, na.rm = TRUE), 
+            obsprev_18 = mean(obsprev_18, na.rm = TRUE), 
+            expprev_18 = mean(expprev_18, na.rm = TRUE),
+            agestdprev_18 = mean(agestdprev_18, na.rm = TRUE),
+            obs_exp_ratio_18 = mean(obs_exp_ratio_18, na.rm = TRUE),
+            listsize_19 = sum(tot_list_size_18_19, na.rm = TRUE), 
+            register_19 = sum(tot_register_18_19, na.rm = TRUE), 
+            obsprev_19 = mean(avg_prevalence_18_19, na.rm = TRUE), 
+            expprev_19 = mean(exp_hyp_18_19, na.rm = TRUE),
+            agestdprev_19 = mean(age_std_prev_18_19, na.rm = TRUE),
+            obs_exp_ratio_19 = mean(obs_over_exp_19, na.rm = TRUE))  
+
+QOF_19_data <- merge(QOF19_grouped, ccg_2020_codes, by.x = 'ccg_code', by.y = 'old_code', all = TRUE)
 
 QOF_19_to_20 <- QOF_19_data %>%
   mutate(., new_code = case_when(ccg_code != QOF_19_data$new_code ~ QOF_19_data$new_code, 
@@ -2308,19 +2392,152 @@ QOF_19_to_20 <- QOF_19_data %>%
 QOF_20 <- merge(QOF_19_to_20, hyper_prev_19_20, by.x = "new_code", by.y = 'ccg_code', all = TRUE) %>%
   rename(ccg_code = new_code)
 
-QOF_20_data <- merge(QOF_20, ccg_2021_codes, by.x = 'ccg_code', by.y = 'old_code', all = TRUE)
+QOF20_grouped <- QOF_20 %>%
+  group_by(ccg_code) %>%
+  summarise(listsize_15 = sum(listsize_15, na.rm = TRUE), 
+            register_15 = sum(register_15, na.rm = TRUE), 
+            obsprev_15 = mean(obsprev_15, na.rm = TRUE), 
+            expprev_15 = mean(expprev_15, na.rm = TRUE),
+            agestdprev_15 = mean(agestdprev_15, na.rm = TRUE),
+            obs_exp_ratio_15 = mean(obs_exp_ratio_15, na.rm = TRUE),
+            listsize_16 = sum(listsize_16, na.rm = TRUE), 
+            register_16 = sum(register_16, na.rm = TRUE), 
+            obsprev_16 = mean(obsprev_16, na.rm = TRUE), 
+            expprev_16 = mean(expprev_16, na.rm = TRUE),
+            agestdprev_16 = mean(agestdprev_16, na.rm = TRUE),
+            obs_exp_ratio_16 = mean(obs_exp_ratio_16, na.rm = TRUE),
+            listsize_17 = sum(listsize_17, na.rm = TRUE), 
+            register_17 = sum(register_17, na.rm = TRUE), 
+            obsprev_17 = mean(obsprev_17, na.rm = TRUE), 
+            expprev_17 = mean(expprev_17, na.rm = TRUE),
+            agestdprev_17 = mean(agestdprev_17, na.rm = TRUE),
+            obs_exp_ratio_17 = mean(obs_exp_ratio_17, na.rm = TRUE),
+            listsize_18 = sum(listsize_18, na.rm = TRUE), 
+            register_18 = sum(register_18, na.rm = TRUE), 
+            obsprev_18 = mean(obsprev_18, na.rm = TRUE), 
+            expprev_18 = mean(expprev_18, na.rm = TRUE),
+            agestdprev_18 = mean(agestdprev_18, na.rm = TRUE),
+            obs_exp_ratio_18 = mean(obs_exp_ratio_18, na.rm = TRUE),
+            listsize_19 = sum(listsize_19, na.rm = TRUE), 
+            register_19 = sum(register_19, na.rm = TRUE), 
+            obsprev_19 = mean(obsprev_19, na.rm = TRUE), 
+            expprev_19 = mean(expprev_19, na.rm = TRUE),
+            agestdprev_19 = mean(agestdprev_19, na.rm = TRUE),
+            obs_exp_ratio_19 = mean(obs_exp_ratio_19, na.rm = TRUE), 
+            listsize_20 = sum(tot_list_size_19_20, na.rm = TRUE), 
+            register_20 = sum(tot_register_19_20, na.rm = TRUE), 
+            obsprev_20 = mean(avg_prevalence_19_20, na.rm = TRUE), 
+            expprev_20 = mean(exp_hyp_19_20, na.rm = TRUE),
+            agestdprev_20 = mean(age_std_prev_19_20, na.rm = TRUE),
+            obs_exp_ratio_20 = mean(obs_over_exp_20, na.rm = TRUE))  
+
+QOF_20_data <- merge(QOF20_grouped, ccg_2021_codes, by.x = 'ccg_code', by.y = 'old_code', all = TRUE)
 
 QOF_20_to_21 <- QOF_20_data %>%
   mutate(., new_code = case_when(ccg_code != QOF_20_data$new_code ~ QOF_20_data$new_code, 
                                  TRUE ~ QOF_20_data$ccg_code)) %>%
   subset(., select = -c(ccg_code))
 
-QOF_21 <- merge(QOF_20_to_21, hyper_prev_20_21, by.x = "new_code", by.y = 'ccg_code', all = TRUE)
+QOF_21 <- merge(QOF_20_to_21, hyper_prev_20_21, by.x = "new_code", by.y = 'ccg_code', all = TRUE) %>%
+  rename(ccg_code = new_code)
 
-QOF_22 <- merge(QOF_21, ccg_agg, by.x = 'new_code', by.y = 'CCG21CDH', all = TRUE)
+QOF21_grouped <- QOF_21 %>%
+  group_by(ccg_code) %>%
+  summarise(listsize_15 = sum(listsize_15, na.rm = TRUE), 
+            register_15 = sum(register_15, na.rm = TRUE), 
+            obsprev_15 = mean(obsprev_15, na.rm = TRUE), 
+            expprev_15 = mean(expprev_15, na.rm = TRUE),
+            agestdprev_15 = mean(agestdprev_15, na.rm = TRUE),
+            obs_exp_ratio_15 = mean(obs_exp_ratio_15, na.rm = TRUE),
+            listsize_16 = sum(listsize_16, na.rm = TRUE), 
+            register_16 = sum(register_16, na.rm = TRUE), 
+            obsprev_16 = mean(obsprev_16, na.rm = TRUE), 
+            expprev_16 = mean(expprev_16, na.rm = TRUE),
+            agestdprev_16 = mean(agestdprev_16, na.rm = TRUE),
+            obs_exp_ratio_16 = mean(obs_exp_ratio_16, na.rm = TRUE),
+            listsize_17 = sum(listsize_17, na.rm = TRUE), 
+            register_17 = sum(register_17, na.rm = TRUE), 
+            obsprev_17 = mean(obsprev_17, na.rm = TRUE), 
+            expprev_17 = mean(expprev_17, na.rm = TRUE),
+            agestdprev_17 = mean(agestdprev_17, na.rm = TRUE),
+            obs_exp_ratio_17 = mean(obs_exp_ratio_17, na.rm = TRUE),
+            listsize_18 = sum(listsize_18, na.rm = TRUE), 
+            register_18 = sum(register_18, na.rm = TRUE), 
+            obsprev_18 = mean(obsprev_18, na.rm = TRUE), 
+            expprev_18 = mean(expprev_18, na.rm = TRUE),
+            agestdprev_18 = mean(agestdprev_18, na.rm = TRUE),
+            obs_exp_ratio_18 = mean(obs_exp_ratio_18, na.rm = TRUE),
+            listsize_19 = sum(listsize_19, na.rm = TRUE), 
+            register_19 = sum(register_19, na.rm = TRUE), 
+            obsprev_19 = mean(obsprev_19, na.rm = TRUE), 
+            expprev_19 = mean(expprev_19, na.rm = TRUE),
+            agestdprev_19 = mean(agestdprev_19, na.rm = TRUE),
+            obs_exp_ratio_19 = mean(obs_exp_ratio_19, na.rm = TRUE), 
+            listsize_20 = sum(listsize_20, na.rm = TRUE), 
+            register_20 = sum(register_20, na.rm = TRUE), 
+            obsprev_20 = mean(obsprev_20, na.rm = TRUE), 
+            expprev_20 = mean(expprev_20, na.rm = TRUE),
+            agestdprev_20 = mean(agestdprev_20, na.rm = TRUE),
+            obs_exp_ratio_20 = mean(obs_exp_ratio_20, na.rm = TRUE),
+            listsize_21 = sum(tot_list_size_20_21, na.rm = TRUE), 
+            register_21 = sum(tot_register_20_21, na.rm = TRUE), 
+            obsprev_21 = mean(avg_prevalence_20_21, na.rm = TRUE), 
+            expprev_21 = mean(exp_hyp_20_21, na.rm = TRUE), 
+            agestdprev_21 = mean(age_std_prev_20_21, na.rm = TRUE), 
+            obs_exp_ratio_21 = mean(obs_over_exp_21, na.rm = TRUE)) 
+  
+QOF_22 <- merge(QOF21_grouped, ccg_agg, by.x = 'ccg_code', by.y = 'CCG21CDH', all = TRUE) 
+  group_by(ccg_code, CCG21CD, CCG21NM) %>%
+  summarise(listsize_15 = sum(listsize_15, na.rm = TRUE), 
+            register_15 = sum(register_15, na.rm = TRUE), 
+            obsprev_15 = mean(obsprev_15, na.rm = TRUE), 
+            expprev_15 = mean(expprev_15, na.rm = TRUE),
+            agestdprev_15 = mean(agestdprev_15, na.rm = TRUE),
+            obs_exp_ratio_15 = mean(obs_exp_ratio_15, na.rm = TRUE),
+            listsize_16 = sum(listsize_16, na.rm = TRUE), 
+            register_16 = sum(register_16, na.rm = TRUE), 
+            obsprev_16 = mean(obsprev_16, na.rm = TRUE), 
+            expprev_16 = mean(expprev_16, na.rm = TRUE),
+            agestdprev_16 = mean(agestdprev_16, na.rm = TRUE),
+            obs_exp_ratio_16 = mean(obs_exp_ratio_16, na.rm = TRUE),
+            listsize_17 = sum(listsize_17, na.rm = TRUE), 
+            register_17 = sum(register_17, na.rm = TRUE), 
+            obsprev_17 = mean(obsprev_17, na.rm = TRUE), 
+            expprev_17 = mean(expprev_17, na.rm = TRUE),
+            agestdprev_17 = mean(agestdprev_17, na.rm = TRUE),
+            obs_exp_ratio_17 = mean(obs_exp_ratio_17, na.rm = TRUE),
+            listsize_18 = sum(listsize_18, na.rm = TRUE), 
+            register_18 = sum(register_18, na.rm = TRUE), 
+            obsprev_18 = mean(obsprev_18, na.rm = TRUE), 
+            expprev_18 = mean(expprev_18, na.rm = TRUE),
+            agestdprev_18 = mean(agestdprev_18, na.rm = TRUE),
+            obs_exp_ratio_18 = mean(obs_exp_ratio_18, na.rm = TRUE),
+            listsize_19 = sum(listsize_19, na.rm = TRUE), 
+            register_19 = sum(register_19, na.rm = TRUE), 
+            obsprev_19 = mean(obsprev_19, na.rm = TRUE), 
+            expprev_19 = mean(expprev_19, na.rm = TRUE),
+            agestdprev_19 = mean(agestdprev_19, na.rm = TRUE),
+            obs_exp_ratio_19 = mean(obs_exp_ratio_19, na.rm = TRUE), 
+            listsize_20 = sum(listsize_20, na.rm = TRUE), 
+            register_20 = sum(register_20, na.rm = TRUE), 
+            obsprev_20 = mean(obsprev_20, na.rm = TRUE), 
+            expprev_20 = mean(expprev_20, na.rm = TRUE),
+            agestdprev_20 = mean(agestdprev_20, na.rm = TRUE),
+            obs_exp_ratio_20 = mean(obs_exp_ratio_20, na.rm = TRUE),
+            listsize_21 = sum(listsize_21, na.rm = TRUE), 
+            register_21 = sum(register_21, na.rm = TRUE), 
+            obsprev_21 = mean(obsprev_21, na.rm = TRUE), 
+            expprev_21 = mean(expprev_21, na.rm = TRUE), 
+            agestdprev_21 = mean(agestdprev_21, na.rm = TRUE), 
+            obs_exp_ratio_21 = mean(obs_exp_ratio_21, na.rm = TRUE), 
+            listsize_22 = sum(tot_list_size_21_22, na.rm = TRUE), 
+            register_22 = sum(tot_register_21_22, na.rm = TRUE), 
+            obsprev_22 = mean(avg_prevalence_21_22, na.rm = TRUE), 
+            expprev_22 = mean(exp_hyp_21_22, na.rm = TRUE), 
+            agestdprev_22 = mean(age_std_prev_21_22, na.rm = TRUE), 
+            obs_exp_ratio_22 = mean(obs_over_exp_22, na.rm = TRUE)) 
 
 QOF_prev <- QOF_22 %>%
-  rename(ccg_code = new_code) %>%
   group_by(CCG21CD) %>%
   summarise(listsize_15 = sum(tot_list_size_14_15, na.rm = TRUE), 
             register_15 = sum(tot_register_14_15, na.rm = TRUE), 
@@ -2373,8 +2590,8 @@ QOF_prev <- QOF_22 %>%
 
 #### Interupted Time Series Analysis ####
 # Transforming the Data for ITS purposes 
-QOF_prev_long <- QOF_prev %>%
-  pivot_longer(!CCG21CD,
+QOF_prev_long <- QOF_22 %>%
+  pivot_longer(!c(ccg_code, CCG21CD, CCG21NM),
                names_to = c("category", "year"),
                names_pattern = "([A-Za-z]+)_(\\d+)", # separates variables by characters and then numbers, similar to name_sep but more sophisticated
                values_to = "score")
