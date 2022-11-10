@@ -366,14 +366,6 @@ tm_shape(ccg_agg_shp) +
   tm_scale_bar(position = c("right", "bottom")) + 
   tm_layout(main.title = "Hypertension Prevalence by CCG", legend.outside = TRUE)
 
-tm_shape(hyper_prev_shp) + 
-  tm_fill(col = 'age_std_prev', border.alpha = 0.8, title = "Age Std. Prevalence %", legend.hist = TRUE, 
-              palette = "-RdBu") + 
-  tm_compass(position = c("right", "top")) +
-  tm_scale_bar(position = c("left", "bottom")) + 
-  tm_layout(main.title = "Hypertension Prevalence by LSOA", legend.outside = TRUE) +
-tm_shape(Eng_CCG) + 
-  tm_borders()
 
 #### Breaking it Down by Region ####
 # Midlands - Prevalence 
@@ -660,6 +652,19 @@ tm_shape(east_eng_ccg_hyper) +
   tm_shape(east_eng_ccg) +
   tm_borders('black', lwd = 1) 
 
+# Investigating Regionally
+ggplot(ccg_hyper) + 
+  aes(x = reorder(NHSER21NM, -age_std_prev), y = age_std_prev, fill = NHSER21NM) + 
+  geom_boxplot(fatten = NULL) +
+  stat_summary(fun = "mean", geom = "point", size = 2, color = "white") + 
+  coord_flip() +
+  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', size = 1) + 
+  geom_text(aes(0, mean(age_std_prev), label = "National Average", vjust = -0.5, hjust = 1.05)) +
+  theme(legend.position = "none") +
+  labs(x = "Region", y = "Age Standardised Prevalence Rate (%)", 
+       title = "Standardised Hypertension Prevalence by Region")
+
+
 #### Deprivation Analysis ####
 lsoa_hyper_imd <- merge(lsoa_age_adj, LSOA_imd_cl, by.x = 'lsoa_code', by.y = 'lsoa_code_2011')
 
@@ -680,36 +685,6 @@ ccg_imd <- merge(ccg_hyper, LSOA_imd_cl, by.x = 'lsoa_code', by.y = 'lsoa_code_2
 
 # Getting IMD Decile by CCG
 ccg_imd$imd_decile <- ntile(ccg_imd$imd_score, 10)
-
-# Investigating the relationship between IMD and Hypertension Prevalence 
-# Investigate by Region 
-ggplot(ccg_hyper) + 
-  aes(x = age_std_prev, color = NHSER21NM, fill = NHSER21NM) + 
-  geom_density(alpha = 0.25)
-
-ggplot(ccg_hyper) + 
-  aes(x = reorder(NHSER21NM, -age_std_prev), y = age_std_prev, fill = NHSER21NM) + 
-  geom_boxplot(fatten = NULL) +
-  stat_summary(fun = "mean", geom = "point", size = 2, color = "white") + 
-  coord_flip() +
-  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', size = 1) + 
-  geom_text(aes(0, mean(age_std_prev), label = "National Average", vjust = -0.5, hjust = 1.05)) +
-  theme(legend.position = "none") +
-  labs(x = "Region", y = "Age Standardised Prevalence Rate (%)", 
-       title = "Standardised Hypertension Prevalence by Region")
-
-geom_boxplot(fatten = NULL) + 
-  coord_flip() +
-  stat_summary(fun = "mean",geom = "point", size = 2, color = "white") +
-  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', size = 1) +
-  geom_text(aes(0, mean(age_std_prev), label = 'East England Mean', vjust = -0.5, hjust = 1.1)) +
-  geom_hline(yintercept = 17.09, color = 'red', size = 1, linetype = 'dashed') +
-  geom_text(aes(0, 17.09, label = 'National Average', color = 'red', vjust = -0.5, hjust = -0.1)) +
-  theme(legend.position = "none")  +
-  labs(y = "Age Standardised Prevalence Rate (%)", x = "CCG", 
-       title = "Standardised Hypertension Prevalence in East England")
-
-
 # Investigate relationship between IMD and Hypertension Prevalence
 ggplot(lsoa_hyper_imd, aes(x = imd_score, y = obs_hyper_prev)) + 
   geom_point(aes(color = imd_decile)) +
@@ -730,12 +705,13 @@ ggplot(lsoa_hyper_imd, aes(x = imd_score, y = age_std_prev, color = imd_decile))
   labs(x = "IMD Score", y = "Age Standardised Prevalence Rate", color = "IMD Decile",
        title = "Relationship Between Hypertension and Deprivation") 
 
-# Comparing the ratio to IMD
+# Comparing expected to observed ratios to IMD
 ggplot(lsoa_hyper_imd, aes(x = imd_score, y = obs_over_exp)) + 
   geom_point(aes(color = imd_decile)) + 
   stat_smooth(method = 'lm', col = 'red', size = 1) + 
   labs(x = "IMD Score", y = "Reported Prevalence to Expected", color = "IMD Decile", 
        title = "Relationship between Deprivation and Hypertension Performance vs Expected")
+# More deprived areas tend to have worse than expected rates of hypertension 
 
 # Breaking down the relationship by Region 
 ## Midlands ##
@@ -791,13 +767,6 @@ tm_shape(stoke_on_trent_hyp) +
   tm_layout(main.title = 'Hypertension Prevalence in Stoke-on-Trent', legend.outside = TRUE) +
 tm_shape(stoke_msoa) + 
   tm_borders("black", lwd = 1)
-
-tm_shape(stoke_msoa) +
-  tm_polygons(col = "age_std_prev", border.alpha = 0.5, title = "Hypertension Prevalence %", 
-          legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
-          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
-  tm_layout(main.title = 'Hypertension Prevalence in Stoke-on-Trent', legend.outside = TRUE)
 
 # Selecting North Staffordshire
 north_staffordshire_hyp <- subset(midlands_imd, CCG21CD == 'E38000126')
@@ -1297,18 +1266,20 @@ abs_gp_hyper <- merge(undiagnosed_hyp_prev, GP_lsoa_data, by = 'practice_code', 
   # Calculating total undiagnosed by GP 
   mutate(undiagnosed_totals = (undiagnosed_hyp/100)*number_of_patients)
 
+# Aggregating at ICS level
 sub_icb_abs <- abs_gp_hyper %>%
   group_by(sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
   summarise(undiagnosed_hypertension = round(sum(undiagnosed_totals, na.rm = TRUE),digits = 0), 
             avg_undiagnosed_percent = mean(undiagnosed_hyp, na.rm = TRUE),
             sub_icb_pop = sum(number_of_patients))
 
+# Aggregating at Regional Level
 regional_abs_undiagnosed <- merge(sub_icb_abs, ccg_region, by.x = 'sub_icb_loc_ods_code', by.y = 'CCG21CDH') %>%
   group_by(NHSER21NM, NHSER21CD) %>%
-  summarise(undiagnosed_prev = mean(avg_undiagnosed_percent),
-            tot_undiagnosed = sum(undiagnosed_hypertension), 
+  summarise(tot_undiagnosed = sum(undiagnosed_hypertension), 
             region_population = sum(sub_icb_pop)) %>%
-  mutate(rate_per_100000 = round(tot_undiagnosed/(region_population/100000), digits = 2))
+  mutate(rate_per_100000 = round(tot_undiagnosed/(region_population/100000), digits = 2), 
+         undiagnosed_prev = round(tot_undiagnosed/region_population*100, digits = 2))
 
 
 #### Objective 3 ####
@@ -2261,28 +2232,7 @@ QOF_17$ccg_code[QOF_17$ccg_code == "00W"] <- "14L"
 QOF_17$ccg_code[QOF_17$ccg_code == "01M"] <- "14L"
 QOF_17$ccg_code[QOF_17$ccg_code == "01N"] <- "14L"
 
-QOF17_grouped <- QOF_17 %>%
-  group_by(ccg_code) %>%
-  summarise(listsize_15 = sum(tot_list_size_14_15, na.rm = TRUE), 
-            register_15 = sum(tot_register_14_15, na.rm = TRUE), 
-            obsprev_15 = mean(avg_prevalence_14_15, na.rm = TRUE), 
-            expprev_15 = mean(exp_hyp_14_15, na.rm = TRUE),
-            agestdprev_15 = mean(age_std_prev_14_15, na.rm = TRUE),
-            obs_exp_ratio_15 = mean(obs_over_exp_15, na.rm = TRUE),
-            listsize_16 = sum(tot_list_size_15_16, na.rm = TRUE), 
-            register_16 = sum(tot_register_15_16, na.rm = TRUE), 
-            obsprev_16 = mean(avg_prevalence_15_16, na.rm = TRUE), 
-            expprev_16 = mean(exp_hyp_15_16, na.rm = TRUE),
-            agestdprev_16 = mean(age_std_prev_15_16, na.rm = TRUE),
-            obs_exp_ratio_16 = mean(obs_over_exp_16, na.rm = TRUE),
-            listsize_17 = sum(tot_list_size_16_17, na.rm = TRUE), 
-            register_17 = sum(tot_register_16_17, na.rm = TRUE), 
-            obsprev_17 = mean(avg_prevalence_16_17, na.rm = TRUE), 
-            expprev_17 = mean(exp_hyp_16_17, na.rm = TRUE),
-            agestdprev_17 = mean(age_std_prev_16_17, na.rm = TRUE),
-            obs_exp_ratio_17 = mean(obs_over_exp_17, na.rm = TRUE))
-
-QOF_18 <- merge(QOF17_grouped, hyper_prev_17_18, by = 'ccg_code', all = TRUE)
+QOF_18 <- merge(QOF_17, hyper_prev_17_18, by = 'ccg_code', all = TRUE)
 # Changing more CCG Codes - 14Y 
 # Note: 14Y does not appear until 2018/19, as Buckinghamshire CCG data is excluded for the 2017/18 year due to small sample size 
 #       and participation in an alternative payment scheme 
@@ -2310,36 +2260,9 @@ QOF_18$ccg_code[QOF_18$ccg_code == "13P"] <- "15E"
 QOF_18$ccg_code[QOF_18$ccg_code == "02V"] <- "15F"
 QOF_18$ccg_code[QOF_18$ccg_code == "03C"] <- "15F"
 QOF_18$ccg_code[QOF_18$ccg_code == "03G"] <- "15F"
-
-QOF18_grouped <- QOF_18 %>%
-  group_by(ccg_code) %>%
-  summarise(listsize_15 = sum(listsize_15, na.rm = TRUE), 
-            register_15 = sum(register_15, na.rm = TRUE), 
-            obsprev_15 = mean(obsprev_15, na.rm = TRUE), 
-            expprev_15 = mean(expprev_15, na.rm = TRUE),
-            agestdprev_15 = mean(agestdprev_15, na.rm = TRUE),
-            obs_exp_ratio_15 = mean(obs_exp_ratio_15, na.rm = TRUE),
-            listsize_16 = sum(listsize_16, na.rm = TRUE), 
-            register_16 = sum(register_16, na.rm = TRUE), 
-            obsprev_16 = mean(obsprev_16, na.rm = TRUE), 
-            expprev_16 = mean(expprev_16, na.rm = TRUE),
-            agestdprev_16 = mean(agestdprev_16, na.rm = TRUE),
-            obs_exp_ratio_16 = mean(obs_exp_ratio_16, na.rm = TRUE),
-            listsize_17 = sum(listsize_17, na.rm = TRUE), 
-            register_17 = sum(register_17, na.rm = TRUE), 
-            obsprev_17 = mean(obsprev_17, na.rm = TRUE), 
-            expprev_17 = mean(expprev_17, na.rm = TRUE),
-            agestdprev_17 = mean(agestdprev_17, na.rm = TRUE),
-            obs_exp_ratio_17 = mean(obs_exp_ratio_17, na.rm = TRUE),
-            listsize_18 = sum(tot_list_size_17_18, na.rm = TRUE), 
-            register_18 = sum(tot_register_17_18, na.rm = TRUE), 
-            obsprev_18 = mean(avg_prevalence_17_18, na.rm = TRUE), 
-            expprev_18 = mean(exp_hyp_17_18, na.rm = TRUE),
-            agestdprev_18 = mean(age_std_prev_17_18, na.rm = TRUE),
-            obs_exp_ratio_18 = mean(obs_over_exp_18, na.rm = TRUE))
   
 
-QOF_19 <- merge(QOF18_grouped, hyper_prev_18_19, by = 'ccg_code', all = TRUE)
+QOF_19 <- merge(QOF_18, hyper_prev_18_19, by = 'ccg_code', all = TRUE)
 # 15M
 QOF_19$ccg_code[QOF_19$ccg_code == "03X"] <- "15M"
 QOF_19$ccg_code[QOF_19$ccg_code == "03Y"] <- "15M"
@@ -2349,40 +2272,7 @@ QOF_19$ccg_code[QOF_19$ccg_code == "04R"] <- "15M"
 QOF_19$ccg_code[QOF_19$ccg_code == "99P"] <- "15N"
 QOF_19$ccg_code[QOF_19$ccg_code == "99Q"] <- "15N"
 
-QOF19_grouped <- QOF_19 %>%
-  group_by(ccg_code) %>%
-  summarise(listsize_15 = sum(listsize_15, na.rm = TRUE), 
-            register_15 = sum(register_15, na.rm = TRUE), 
-            obsprev_15 = mean(obsprev_15, na.rm = TRUE), 
-            expprev_15 = mean(expprev_15, na.rm = TRUE),
-            agestdprev_15 = mean(agestdprev_15, na.rm = TRUE),
-            obs_exp_ratio_15 = mean(obs_exp_ratio_15, na.rm = TRUE),
-            listsize_16 = sum(listsize_16, na.rm = TRUE), 
-            register_16 = sum(register_16, na.rm = TRUE), 
-            obsprev_16 = mean(obsprev_16, na.rm = TRUE), 
-            expprev_16 = mean(expprev_16, na.rm = TRUE),
-            agestdprev_16 = mean(agestdprev_16, na.rm = TRUE),
-            obs_exp_ratio_16 = mean(obs_exp_ratio_16, na.rm = TRUE),
-            listsize_17 = sum(listsize_17, na.rm = TRUE), 
-            register_17 = sum(register_17, na.rm = TRUE), 
-            obsprev_17 = mean(obsprev_17, na.rm = TRUE), 
-            expprev_17 = mean(expprev_17, na.rm = TRUE),
-            agestdprev_17 = mean(agestdprev_17, na.rm = TRUE),
-            obs_exp_ratio_17 = mean(obs_exp_ratio_17, na.rm = TRUE),
-            listsize_18 = sum(listsize_18, na.rm = TRUE), 
-            register_18 = sum(register_18, na.rm = TRUE), 
-            obsprev_18 = mean(obsprev_18, na.rm = TRUE), 
-            expprev_18 = mean(expprev_18, na.rm = TRUE),
-            agestdprev_18 = mean(agestdprev_18, na.rm = TRUE),
-            obs_exp_ratio_18 = mean(obs_exp_ratio_18, na.rm = TRUE),
-            listsize_19 = sum(tot_list_size_18_19, na.rm = TRUE), 
-            register_19 = sum(tot_register_18_19, na.rm = TRUE), 
-            obsprev_19 = mean(avg_prevalence_18_19, na.rm = TRUE), 
-            expprev_19 = mean(exp_hyp_18_19, na.rm = TRUE),
-            agestdprev_19 = mean(age_std_prev_18_19, na.rm = TRUE),
-            obs_exp_ratio_19 = mean(obs_over_exp_19, na.rm = TRUE))  
-
-QOF_19_data <- merge(QOF19_grouped, ccg_2020_codes, by.x = 'ccg_code', by.y = 'old_code', all = TRUE)
+QOF_19_data <- merge(QOF_19, ccg_2020_codes, by.x = 'ccg_code', by.y = 'old_code', all = TRUE)
 
 QOF_19_to_20 <- QOF_19_data %>%
   mutate(., new_code = case_when(ccg_code != QOF_19_data$new_code ~ QOF_19_data$new_code, 
@@ -2392,46 +2282,7 @@ QOF_19_to_20 <- QOF_19_data %>%
 QOF_20 <- merge(QOF_19_to_20, hyper_prev_19_20, by.x = "new_code", by.y = 'ccg_code', all = TRUE) %>%
   rename(ccg_code = new_code)
 
-QOF20_grouped <- QOF_20 %>%
-  group_by(ccg_code) %>%
-  summarise(listsize_15 = sum(listsize_15, na.rm = TRUE), 
-            register_15 = sum(register_15, na.rm = TRUE), 
-            obsprev_15 = mean(obsprev_15, na.rm = TRUE), 
-            expprev_15 = mean(expprev_15, na.rm = TRUE),
-            agestdprev_15 = mean(agestdprev_15, na.rm = TRUE),
-            obs_exp_ratio_15 = mean(obs_exp_ratio_15, na.rm = TRUE),
-            listsize_16 = sum(listsize_16, na.rm = TRUE), 
-            register_16 = sum(register_16, na.rm = TRUE), 
-            obsprev_16 = mean(obsprev_16, na.rm = TRUE), 
-            expprev_16 = mean(expprev_16, na.rm = TRUE),
-            agestdprev_16 = mean(agestdprev_16, na.rm = TRUE),
-            obs_exp_ratio_16 = mean(obs_exp_ratio_16, na.rm = TRUE),
-            listsize_17 = sum(listsize_17, na.rm = TRUE), 
-            register_17 = sum(register_17, na.rm = TRUE), 
-            obsprev_17 = mean(obsprev_17, na.rm = TRUE), 
-            expprev_17 = mean(expprev_17, na.rm = TRUE),
-            agestdprev_17 = mean(agestdprev_17, na.rm = TRUE),
-            obs_exp_ratio_17 = mean(obs_exp_ratio_17, na.rm = TRUE),
-            listsize_18 = sum(listsize_18, na.rm = TRUE), 
-            register_18 = sum(register_18, na.rm = TRUE), 
-            obsprev_18 = mean(obsprev_18, na.rm = TRUE), 
-            expprev_18 = mean(expprev_18, na.rm = TRUE),
-            agestdprev_18 = mean(agestdprev_18, na.rm = TRUE),
-            obs_exp_ratio_18 = mean(obs_exp_ratio_18, na.rm = TRUE),
-            listsize_19 = sum(listsize_19, na.rm = TRUE), 
-            register_19 = sum(register_19, na.rm = TRUE), 
-            obsprev_19 = mean(obsprev_19, na.rm = TRUE), 
-            expprev_19 = mean(expprev_19, na.rm = TRUE),
-            agestdprev_19 = mean(agestdprev_19, na.rm = TRUE),
-            obs_exp_ratio_19 = mean(obs_exp_ratio_19, na.rm = TRUE), 
-            listsize_20 = sum(tot_list_size_19_20, na.rm = TRUE), 
-            register_20 = sum(tot_register_19_20, na.rm = TRUE), 
-            obsprev_20 = mean(avg_prevalence_19_20, na.rm = TRUE), 
-            expprev_20 = mean(exp_hyp_19_20, na.rm = TRUE),
-            agestdprev_20 = mean(age_std_prev_19_20, na.rm = TRUE),
-            obs_exp_ratio_20 = mean(obs_over_exp_20, na.rm = TRUE))  
-
-QOF_20_data <- merge(QOF20_grouped, ccg_2021_codes, by.x = 'ccg_code', by.y = 'old_code', all = TRUE)
+QOF_20_data <- merge(QOF_20, ccg_2021_codes, by.x = 'ccg_code', by.y = 'old_code', all = TRUE)
 
 QOF_20_to_21 <- QOF_20_data %>%
   mutate(., new_code = case_when(ccg_code != QOF_20_data$new_code ~ QOF_20_data$new_code, 
@@ -2440,149 +2291,40 @@ QOF_20_to_21 <- QOF_20_data %>%
 
 QOF_21 <- merge(QOF_20_to_21, hyper_prev_20_21, by.x = "new_code", by.y = 'ccg_code', all = TRUE) %>%
   rename(ccg_code = new_code)
-
-QOF21_grouped <- QOF_21 %>%
-  group_by(ccg_code) %>%
-  summarise(listsize_15 = sum(listsize_15, na.rm = TRUE), 
-            register_15 = sum(register_15, na.rm = TRUE), 
-            obsprev_15 = mean(obsprev_15, na.rm = TRUE), 
-            expprev_15 = mean(expprev_15, na.rm = TRUE),
-            agestdprev_15 = mean(agestdprev_15, na.rm = TRUE),
-            obs_exp_ratio_15 = mean(obs_exp_ratio_15, na.rm = TRUE),
-            listsize_16 = sum(listsize_16, na.rm = TRUE), 
-            register_16 = sum(register_16, na.rm = TRUE), 
-            obsprev_16 = mean(obsprev_16, na.rm = TRUE), 
-            expprev_16 = mean(expprev_16, na.rm = TRUE),
-            agestdprev_16 = mean(agestdprev_16, na.rm = TRUE),
-            obs_exp_ratio_16 = mean(obs_exp_ratio_16, na.rm = TRUE),
-            listsize_17 = sum(listsize_17, na.rm = TRUE), 
-            register_17 = sum(register_17, na.rm = TRUE), 
-            obsprev_17 = mean(obsprev_17, na.rm = TRUE), 
-            expprev_17 = mean(expprev_17, na.rm = TRUE),
-            agestdprev_17 = mean(agestdprev_17, na.rm = TRUE),
-            obs_exp_ratio_17 = mean(obs_exp_ratio_17, na.rm = TRUE),
-            listsize_18 = sum(listsize_18, na.rm = TRUE), 
-            register_18 = sum(register_18, na.rm = TRUE), 
-            obsprev_18 = mean(obsprev_18, na.rm = TRUE), 
-            expprev_18 = mean(expprev_18, na.rm = TRUE),
-            agestdprev_18 = mean(agestdprev_18, na.rm = TRUE),
-            obs_exp_ratio_18 = mean(obs_exp_ratio_18, na.rm = TRUE),
-            listsize_19 = sum(listsize_19, na.rm = TRUE), 
-            register_19 = sum(register_19, na.rm = TRUE), 
-            obsprev_19 = mean(obsprev_19, na.rm = TRUE), 
-            expprev_19 = mean(expprev_19, na.rm = TRUE),
-            agestdprev_19 = mean(agestdprev_19, na.rm = TRUE),
-            obs_exp_ratio_19 = mean(obs_exp_ratio_19, na.rm = TRUE), 
-            listsize_20 = sum(listsize_20, na.rm = TRUE), 
-            register_20 = sum(register_20, na.rm = TRUE), 
-            obsprev_20 = mean(obsprev_20, na.rm = TRUE), 
-            expprev_20 = mean(expprev_20, na.rm = TRUE),
-            agestdprev_20 = mean(agestdprev_20, na.rm = TRUE),
-            obs_exp_ratio_20 = mean(obs_exp_ratio_20, na.rm = TRUE),
-            listsize_21 = sum(tot_list_size_20_21, na.rm = TRUE), 
-            register_21 = sum(tot_register_20_21, na.rm = TRUE), 
-            obsprev_21 = mean(avg_prevalence_20_21, na.rm = TRUE), 
-            expprev_21 = mean(exp_hyp_20_21, na.rm = TRUE), 
-            agestdprev_21 = mean(age_std_prev_20_21, na.rm = TRUE), 
-            obs_exp_ratio_21 = mean(obs_over_exp_21, na.rm = TRUE)) 
   
-QOF_22 <- merge(QOF21_grouped, ccg_agg, by.x = 'ccg_code', by.y = 'CCG21CDH', all = TRUE) 
-  group_by(ccg_code, CCG21CD, CCG21NM) %>%
-  summarise(listsize_15 = sum(listsize_15, na.rm = TRUE), 
-            register_15 = sum(register_15, na.rm = TRUE), 
-            obsprev_15 = mean(obsprev_15, na.rm = TRUE), 
-            expprev_15 = mean(expprev_15, na.rm = TRUE),
-            agestdprev_15 = mean(agestdprev_15, na.rm = TRUE),
-            obs_exp_ratio_15 = mean(obs_exp_ratio_15, na.rm = TRUE),
-            listsize_16 = sum(listsize_16, na.rm = TRUE), 
-            register_16 = sum(register_16, na.rm = TRUE), 
-            obsprev_16 = mean(obsprev_16, na.rm = TRUE), 
-            expprev_16 = mean(expprev_16, na.rm = TRUE),
-            agestdprev_16 = mean(agestdprev_16, na.rm = TRUE),
-            obs_exp_ratio_16 = mean(obs_exp_ratio_16, na.rm = TRUE),
-            listsize_17 = sum(listsize_17, na.rm = TRUE), 
-            register_17 = sum(register_17, na.rm = TRUE), 
-            obsprev_17 = mean(obsprev_17, na.rm = TRUE), 
-            expprev_17 = mean(expprev_17, na.rm = TRUE),
-            agestdprev_17 = mean(agestdprev_17, na.rm = TRUE),
-            obs_exp_ratio_17 = mean(obs_exp_ratio_17, na.rm = TRUE),
-            listsize_18 = sum(listsize_18, na.rm = TRUE), 
-            register_18 = sum(register_18, na.rm = TRUE), 
-            obsprev_18 = mean(obsprev_18, na.rm = TRUE), 
-            expprev_18 = mean(expprev_18, na.rm = TRUE),
-            agestdprev_18 = mean(agestdprev_18, na.rm = TRUE),
-            obs_exp_ratio_18 = mean(obs_exp_ratio_18, na.rm = TRUE),
-            listsize_19 = sum(listsize_19, na.rm = TRUE), 
-            register_19 = sum(register_19, na.rm = TRUE), 
-            obsprev_19 = mean(obsprev_19, na.rm = TRUE), 
-            expprev_19 = mean(expprev_19, na.rm = TRUE),
-            agestdprev_19 = mean(agestdprev_19, na.rm = TRUE),
-            obs_exp_ratio_19 = mean(obs_exp_ratio_19, na.rm = TRUE), 
-            listsize_20 = sum(listsize_20, na.rm = TRUE), 
-            register_20 = sum(register_20, na.rm = TRUE), 
-            obsprev_20 = mean(obsprev_20, na.rm = TRUE), 
-            expprev_20 = mean(expprev_20, na.rm = TRUE),
-            agestdprev_20 = mean(agestdprev_20, na.rm = TRUE),
-            obs_exp_ratio_20 = mean(obs_exp_ratio_20, na.rm = TRUE),
-            listsize_21 = sum(listsize_21, na.rm = TRUE), 
-            register_21 = sum(register_21, na.rm = TRUE), 
-            obsprev_21 = mean(obsprev_21, na.rm = TRUE), 
-            expprev_21 = mean(expprev_21, na.rm = TRUE), 
-            agestdprev_21 = mean(agestdprev_21, na.rm = TRUE), 
-            obs_exp_ratio_21 = mean(obs_exp_ratio_21, na.rm = TRUE), 
-            listsize_22 = sum(tot_list_size_21_22, na.rm = TRUE), 
-            register_22 = sum(tot_register_21_22, na.rm = TRUE), 
-            obsprev_22 = mean(avg_prevalence_21_22, na.rm = TRUE), 
-            expprev_22 = mean(exp_hyp_21_22, na.rm = TRUE), 
-            agestdprev_22 = mean(age_std_prev_21_22, na.rm = TRUE), 
-            obs_exp_ratio_22 = mean(obs_over_exp_22, na.rm = TRUE)) 
+QOF_22 <- merge(QOF_21, ccg_agg, by.x = 'ccg_code', by.y = 'CCG21CDH', all = TRUE) 
 
 QOF_prev <- QOF_22 %>%
-  group_by(CCG21CD) %>%
-  summarise(listsize_15 = sum(tot_list_size_14_15, na.rm = TRUE), 
-            register_15 = sum(tot_register_14_15, na.rm = TRUE), 
-            obsprev_15 = mean(avg_prevalence_14_15, na.rm = TRUE), 
+  group_by(ccg_code, CCG21CD, CCG21NM) %>%
+  summarise(obsprev_15 = mean(avg_prevalence_14_15, na.rm = TRUE), 
             expprev_15 = mean(exp_hyp_14_15, na.rm = TRUE),
             agestdprev_15 = mean(age_std_prev_14_15, na.rm = TRUE),
             obs_exp_ratio_15 = mean(obs_over_exp_15, na.rm = TRUE),
-            listsize_16 = sum(tot_list_size_15_16, na.rm = TRUE), 
-            register_16 = sum(tot_register_15_16, na.rm = TRUE), 
             obsprev_16 = mean(avg_prevalence_15_16, na.rm = TRUE), 
             expprev_16 = mean(exp_hyp_15_16, na.rm = TRUE),
             agestdprev_16 = mean(age_std_prev_15_16, na.rm = TRUE),
             obs_exp_ratio_16 = mean(obs_over_exp_16, na.rm = TRUE),
-            listsize_17 = sum(tot_list_size_16_17, na.rm = TRUE), 
-            register_17 = sum(tot_register_16_17, na.rm = TRUE), 
             obsprev_17 = mean(avg_prevalence_16_17, na.rm = TRUE), 
             expprev_17 = mean(exp_hyp_16_17, na.rm = TRUE),
             agestdprev_17 = mean(age_std_prev_16_17, na.rm = TRUE),
             obs_exp_ratio_17 = mean(obs_over_exp_17, na.rm = TRUE),
-            listsize_18 = sum(tot_list_size_17_18, na.rm = TRUE), 
-            register_18 = sum(tot_register_17_18, na.rm = TRUE), 
             obsprev_18 = mean(avg_prevalence_17_18, na.rm = TRUE), 
             expprev_18 = mean(exp_hyp_17_18, na.rm = TRUE),
             agestdprev_18 = mean(age_std_prev_17_18, na.rm = TRUE),
             obs_exp_ratio_18 = mean(obs_over_exp_18, na.rm = TRUE),
-            listsize_19 = sum(tot_list_size_18_19, na.rm = TRUE), 
-            register_19 = sum(tot_register_18_19, na.rm = TRUE), 
             obsprev_19 = mean(avg_prevalence_18_19, na.rm = TRUE), 
             expprev_19 = mean(exp_hyp_18_19, na.rm = TRUE),
             agestdprev_19 = mean(age_std_prev_18_19, na.rm = TRUE),
             obs_exp_ratio_19 = mean(obs_over_exp_19, na.rm = TRUE),
-            listsize_20 = sum(tot_list_size_19_20, na.rm = TRUE), 
-            register_20 = sum(tot_register_19_20, na.rm = TRUE), 
             obsprev_20 = mean(avg_prevalence_19_20, na.rm = TRUE), 
             expprev_20 = mean(exp_hyp_19_20, na.rm = TRUE),
             agestdprev_20 = mean(age_std_prev_19_20, na.rm = TRUE),
             obs_exp_ratio_20 = mean(obs_over_exp_20, na.rm = TRUE),
-            listsize_21 = sum(tot_list_size_20_21, na.rm = TRUE), 
-            register_21 = sum(tot_register_20_21, na.rm = TRUE), 
             obsprev_21 = mean(avg_prevalence_20_21, na.rm = TRUE), 
             expprev_21 = mean(exp_hyp_20_21, na.rm = TRUE), 
             agestdprev_21 = mean(age_std_prev_20_21, na.rm = TRUE), 
             obs_exp_ratio_21 = mean(obs_over_exp_21, na.rm = TRUE), 
-            listsize_22 = sum(tot_list_size_21_22, na.rm = TRUE), 
-            register_22 = sum(tot_register_21_22, na.rm = TRUE), 
+            patients_22 = mean(lsoa_pop_21_22, na.rm = TRUE),
             obsprev_22 = mean(avg_prevalence_21_22, na.rm = TRUE), 
             expprev_22 = mean(exp_hyp_21_22, na.rm = TRUE), 
             agestdprev_22 = mean(age_std_prev_21_22, na.rm = TRUE), 
@@ -2590,8 +2332,8 @@ QOF_prev <- QOF_22 %>%
 
 #### Interupted Time Series Analysis ####
 # Transforming the Data for ITS purposes 
-QOF_prev_long <- QOF_22 %>%
-  pivot_longer(!c(ccg_code, CCG21CD, CCG21NM),
+QOF_prev_long <- QOF_prev %>%
+  pivot_longer(!c(ccg_code, CCG21CD, CCG21NM, patients_22),
                names_to = c("category", "year"),
                names_pattern = "([A-Za-z]+)_(\\d+)", # separates variables by characters and then numbers, similar to name_sep but more sophisticated
                values_to = "score")
@@ -2600,8 +2342,7 @@ QOF_prev_long <- QOF_22 %>%
 QOF_prev_cl <- QOF_prev_long %>%
   pivot_wider(names_from = "category", 
               values_from = "score") %>%
-  rename(list_size = listsize, 
-         age_std_prevalence = agestdprev, 
+  rename(age_std_prevalence = agestdprev, 
          exp_prevalence = expprev, 
          obs_prevalence = obsprev) %>%
   mutate_at('year', as.numeric) %>%
@@ -2623,7 +2364,7 @@ summary(fit_14_19)
 # Fitting the yearly increase (0.11226) to the 2019 data to account for the change in prevalence 
 # When shifted to include 2019 (as the threshold change doesn't impact prevalance), coefficient = 0.12606
 QOF_prev_20_22 <- QOF_prev %>%
-  select(CCG21CD, agestdprev_20, agestdprev_21, agestdprev_22)
+  select(CCG21CD, agestdprev_20, agestdprev_21, agestdprev_22, patients_22)
 
 # Calculating the expected prevalence 
 QOF_prev_20_22 <- QOF_prev_20_22 %>%
@@ -2632,7 +2373,7 @@ QOF_prev_20_22 <- QOF_prev_20_22 %>%
          # Now calculating the difference between the expected change and obs change to get the covid effect
          age_std_prev_diff_21 = case_when(agestdprev_21 - exp_age_std_prev_21 <= 0 ~ agestdprev_21 - exp_age_std_prev_21,
                                           T ~ 0),
-         age_std_prev_diff_22 = agestdprev_22 - exp_age_std_prev_22)
+         age_std_prev_diff_22 = (agestdprev_22-agestdprev_21) - (exp_age_std_prev_22-exp_age_std_prev_21))
   
 
 # plotting differences
@@ -2653,46 +2394,30 @@ tm_shape(prev_diff_shp) +
   tm_layout(main.title = 'Unreported Hypertension in the UK (2022)', legend.outside = TRUE) 
 
 # Finding Absolute Values in Differences
-# Load CCG Population Data
-ccg_pop <- read_csv("ccg population estimates.csv", skip = 6) %>%
-  clean_names() %>%
-  select(ccg_code, ccg_name, nhser21_name, all_ages)
-
-# Creating a file that separates by age for GP
-ccg_pop_all <- read_csv("ccg population estimates.csv", skip = 6) %>%
-  clean_names() %>%
-  mutate(under79_pop = rowSums(select(., x0:x79)),
-         over80_pop = rowSums(select(., x80:x90))) %>%
-  select(-starts_with('x')) %>%
-  drop_na()
-
-
-# Merge population to covid effect
-abs_hyper_shp <- merge(prev_diff_shp, ccg_pop, by.x = 'CCG21CD', by.y = 'ccg_code')
-
 # calculate absolute totals
-abs_hyper_shp <- abs_hyper_shp %>%
-  mutate(undiagnosed_21 = (age_std_prev_diff_21/100)*all_ages, 
-         undiagnosed_22 = case_when(age_std_prev_diff_22 > 0 ~ ((age_std_prev_diff_22+age_std_prev_diff_21)/100)*all_ages, 
-                                    T ~ ((age_std_prev_diff_22-age_std_prev_diff_21)/100)*all_ages))
+abs_hyper_shp <- prev_diff_shp %>%
+  mutate(undiagnosed_21 = (age_std_prev_diff_21/100)*patients_22, 
+         undiagnosed_22 = case_when(age_std_prev_diff_22 > 0 ~ ((age_std_prev_diff_22+age_std_prev_diff_21)/100)*patients_22, 
+                                    T ~ ((age_std_prev_diff_22-age_std_prev_diff_21)/100)*patients_22))
 
 # Merge all the undiagnosed data into one column 
 abs_hyper_long <- abs_hyper_shp %>%
   pivot_longer(cols = starts_with("undiagnosed"), 
                names_to = "year", names_prefix = "undiagnosed_", 
-               values_to = "undiagnosed_totals") %>%
-  select(-OBJECTID, -ccg_name)
+               values_to = "undiagnosed_totals") 
 
 # merge to regional data 
-ggplot(abs_hyper_long, aes(x = nhser21_name, y = undiagnosed_totals, fill = year)) + 
+abs_hyper_region <- full_join(abs_hyper_long, ccg_region)
+
+ggplot(abs_hyper_region, aes(x = NHSER21NM, y = undiagnosed_totals, fill = year)) + 
   geom_col() +
   labs(x = "Region", y = "Missed Diagnoses", title = "Missed Diagnoses by Region") +
   scale_fill_manual(values = c("#00a3c7", "#d8b2b4")) + 
-  stat_summary(fun = sum, aes(label = format(..y.., digits = 5), group = nhser21_name), geom = "text")
+  stat_summary(fun = sum, aes(label = format(..y.., digits = 5), group = NHSER21NM), geom = "text")
 
 # Find Regional values 
-regional_totals <- abs_hyper_long %>%
-  group_by(nhser21_name, year) %>%
+regional_totals <- abs_hyper_region %>%
+  group_by(NHSER21NM, year) %>%
   summarise(undiagnosed_total = round(sum(undiagnosed_totals), 0))
 
 
