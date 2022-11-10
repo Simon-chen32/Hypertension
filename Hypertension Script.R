@@ -223,8 +223,8 @@ lsoa_grouped <- lsoa_hyper_prev %>%
 lsoa_age_adj <- lsoa_grouped %>%
   mutate(obs_over_exp = obs_hyper_prev/exp_hyper_prev,
          u79_obs_over_exp = obs_u79_prev/exp_u79_prev,
-         age_std_prev = obs_hyper_prev*obs_over_exp, 
-         age_std_u79_prev = obs_u79_prev*u79_obs_over_exp)
+         age_std_prev = mean(obs_hyper_prev)*obs_over_exp, 
+         age_std_u79_prev = mean(obs_u79_prev)*u79_obs_over_exp)
 
 # Merging at CCG 
 ccg_grouped <- merge(lsoa_age_adj, lsoa_ccg_la, by.x = 'lsoa_code', by.y = 'LSOA11CD') 
@@ -282,7 +282,7 @@ ccg_agg <- ccg_grouped %>%
             avg_o80_achievement_21_22 = mean(o80_achievement), 
             avg_o80_intervention_21_22 = mean(o80_intervention)) %>%
   # including variable to indicate if above or below national average
-  mutate(above_average = case_when(age_std_prev_21_22 > 15.23 ~ 1, 
+  mutate(above_average = case_when(age_std_prev_21_22 > 15.11 ~ 1, 
                                    T ~ 0))
 
 ccg_agg_shp <- merge(Eng_CCG, ccg_agg, by = c('CCG21CD', 'CCG21NM'))
@@ -1381,7 +1381,7 @@ ccg_age_dist_15 <- ccg_age_dist_15 %>%
 hyper_prev_14_15 <- merge(ccg_age_dist_15, Hyper14_15_cl, by = 'ccg_code') %>%
   # Creating Ratios and Age Standardising
   mutate(obs_over_exp_15 = avg_prevalence_14_15/exp_hyp_14_15, 
-         age_std_prev_14_15 = avg_prevalence_14_15*obs_over_exp_15) %>%
+         age_std_prev_14_15 = mean(avg_prevalence_14_15)*obs_over_exp_15) %>%
   # selecting variables 
   select(ccg_code, avg_prevalence_14_15, exp_hyp_male_14_15, exp_hyp_female_14_15, exp_hyp_14_15, 
          tot_list_size_14_15, tot_register_14_15, tot_numerator_14_15, tot_denominator_14_15, avg_achievement_14_15, 
@@ -1414,7 +1414,8 @@ Hyper15_16_cl <- Hyper15_16 %>%
             avg_achievement_15_16 = mean(achievement_net_exceptions_15_16), 
             avg_intervention_15_16 = mean(percent_receiving_intervention_15_16))
 
-
+# Manually Calculating the Prevalence Value for CCG 10W which is missing it's prevalence
+Hyper15_16_cl$avg_prevalence_15_16[Hyper15_16_cl$ccg_code=="10W"] <- 10.110175
 
 age_dist_16 <- read_csv("~/Hypertension/Population Age Distributions/gp_age_dist_jan_2016.csv") %>%
   clean_names()
@@ -1513,7 +1514,7 @@ ccg_age_dist_16 <- ccg_age_dist_16 %>%
 hyper_prev_15_16 <- merge(ccg_age_dist_16, Hyper15_16_cl, by = 'ccg_code') %>%
   # Creating Ratios and Age Standardising
   mutate(obs_over_exp_16 = avg_prevalence_15_16/exp_hyp_15_16, 
-         age_std_prev_15_16 = avg_prevalence_15_16*obs_over_exp_16) %>%
+         age_std_prev_15_16 = mean(avg_prevalence_15_16)*obs_over_exp_16) %>%
   # selecting variables 
   select(ccg_code, avg_prevalence_15_16, exp_hyp_male_15_16, exp_hyp_female_15_16, exp_hyp_15_16, 
          tot_list_size_15_16, tot_register_15_16, tot_numerator_15_16, tot_denominator_15_16, avg_achievement_15_16, 
@@ -1650,7 +1651,7 @@ ccg_age_dist_17 <- ccg_age_dist_17 %>%
 hyper_prev_16_17 <- merge(ccg_age_dist_17, Hyper16_17_cl, by = 'ccg_code') %>%
   # Creating Ratios and Age Standardising
   mutate(obs_over_exp_17 = avg_prevalence_16_17/exp_hyp_16_17, 
-         age_std_prev_16_17 = avg_prevalence_16_17*obs_over_exp_17) %>%
+         age_std_prev_16_17 = mean(avg_prevalence_16_17)*obs_over_exp_17) %>%
   # selecting variables 
   select(ccg_code, avg_prevalence_16_17, exp_hyp_male_16_17, exp_hyp_female_16_17, exp_hyp_16_17, 
          tot_list_size_16_17, tot_register_16_17, tot_numerator_16_17, tot_denominator_16_17, avg_achievement_16_17, 
@@ -1788,7 +1789,7 @@ ccg_age_dist_18 <- ccg_age_dist_18 %>%
 hyper_prev_17_18 <- merge(ccg_age_dist_18, Hyper17_18_cl, by = 'ccg_code') %>%
   # Creating Ratios and Age Standardising
   mutate(obs_over_exp_18 = avg_prevalence_17_18/exp_hyp_17_18, 
-         age_std_prev_17_18 = avg_prevalence_17_18*obs_over_exp_18) %>%
+         age_std_prev_17_18 = mean(avg_prevalence_17_18)*obs_over_exp_18) %>%
   # selecting variables 
   select(ccg_code, avg_prevalence_17_18, exp_hyp_male_17_18, exp_hyp_female_17_18, exp_hyp_17_18, 
          tot_list_size_17_18, tot_register_17_18, tot_numerator_17_18, tot_denominator_17_18, avg_achievement_17_18, 
@@ -1924,7 +1925,7 @@ ccg_age_dist_19 <- ccg_age_dist_19 %>%
 hyper_prev_18_19 <- merge(ccg_age_dist_19, Hyper18_19_cl, by = 'ccg_code') %>%
   # Creating Ratios and Age Standardising
   mutate(obs_over_exp_19 = avg_prevalence_18_19/exp_hyp_18_19, 
-         age_std_prev_18_19 = avg_prevalence_18_19*obs_over_exp_19) %>%
+         age_std_prev_18_19 = mean(avg_prevalence_18_19)*obs_over_exp_19) %>%
   # selecting variables 
   select(ccg_code, avg_prevalence_18_19, exp_hyp_18_19, exp_hyp_male_18_19, exp_hyp_female_18_19,
          tot_list_size_18_19, tot_register_18_19, tot_numerator_18_19, tot_denominator_18_19, avg_achievement_18_19, 
@@ -2078,7 +2079,7 @@ ccg_age_dist_20 <- ccg_age_dist_20 %>%
 hyper_prev_19_20 <- merge(ccg_age_dist_20, Hyper19_20_cl, by = 'ccg_code') %>%
   # Creating Ratios and Age Standardising
   mutate(obs_over_exp_20 = avg_prevalence_19_20/exp_hyp_19_20, 
-         age_std_prev_19_20 = avg_prevalence_19_20*obs_over_exp_20) %>%
+         age_std_prev_19_20 = mean(avg_prevalence_19_20)*obs_over_exp_20) %>%
   # selecting variables 
   select(ccg_code, avg_prevalence_19_20, exp_hyp_19_20, exp_hyp_male_19_20, exp_hyp_female_19_20,
          tot_list_size_19_20, tot_register_19_20, tot_u79_numerator_19_20, tot_u79_denominator_19_20, 
@@ -2207,7 +2208,7 @@ ccg_age_dist_21 <- ccg_age_dist_21 %>%
 hyper_prev_20_21 <- merge(ccg_age_dist_21, Hyper20_21_cl, by = 'ccg_code') %>%
   # Creating Ratios and Age Standardising
   mutate(obs_over_exp_21 = avg_prevalence_20_21/exp_hyp_20_21, 
-         age_std_prev_20_21 = avg_prevalence_20_21*obs_over_exp_21) %>%
+         age_std_prev_20_21 = mean(avg_prevalence_20_21)*obs_over_exp_21) %>%
   # selecting variables 
   select(ccg_code, avg_prevalence_20_21, exp_hyp_20_21, exp_hyp_male_20_21, exp_hyp_female_20_21,
          tot_list_size_20_21, tot_register_20_21, 
@@ -2356,6 +2357,14 @@ QOF_prev_14_19 <- QOF_prev_cl %>%
 # performing ITS 
 itsa <- lm(age_std_prevalence ~ year + covid + year*covid, data = QOF_prev_cl)
 summary(itsa)
+
+# Just Year 
+year_reg <- lm(age_std_prevalence ~ year, data = QOF_prev_cl)
+summary(year_reg)
+
+# Year and Covid without Interaction 
+covid_yr_regression <- lm(age_std_prevalence ~ year + covid, dat = QOF_prev_cl)
+summary(covid_yr_regression)
 
 # Finding what the average yearly increase in prevalence is from 2014-15 to 2017-18 
 fit_14_19 <- lm(age_std_prevalence ~ year, data = QOF_prev_14_19)
