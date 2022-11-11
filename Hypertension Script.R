@@ -196,7 +196,8 @@ GP_lsoa_age_data <- merge(GP_age_dist_cl, GP_lsoa_data, by.x = 'org_code', by.y 
 lsoa_hyper_prev <- merge(GP_lsoa_age_data, Hyper21_22_cl, by.x = 'org_code', by.y = 'practice_code') %>%
   # Create new column for the percentage of patients a GP serves in each LSOA 
   mutate(gp_coverage = (number_of_patients/lsoa_pop), 
-         gp_share = (number_of_patients/list_size_21_22)*register_21_22, 
+         total80plus = male80plus + female80plus,
+         tot_o80 = (number_of_patients/all_all)*total80plus,
          exp_hyp = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100, 
          exp_u79_hyp = (exp_u79_hyp_male*male_u79_perc + exp_u79_hyp_female*female_u79_perc)*100)
 
@@ -214,6 +215,7 @@ lsoa_grouped <- lsoa_hyper_prev %>%
             exp_hyper_prev = sum(exp_hyp*gp_coverage),
             exp_u79_prev = sum(gp_coverage*exp_u79_hyp), 
             lsoa_pop = mean(lsoa_pop), 
+            over80_pop = sum(tot_o80),
             u79_achievement = sum(gp_coverage*under79_achievement_net_exceptions_21_22), 
             u79_intervention = sum(gp_coverage*under79_percent_receiving_intervention_21_22), 
             o80_achievement = sum(gp_coverage*over80_achievement_net_exceptions_21_22), 
@@ -226,6 +228,10 @@ lsoa_age_adj <- lsoa_grouped %>%
          age_std_prev = mean(obs_hyper_prev)*obs_over_exp, 
          age_std_u79_prev = mean(obs_u79_prev)*u79_obs_over_exp)
 
+# Finding the Top Decile of LSOAs by Prevalence
+lsoa_age_adj$percentile <- ntile(lsoa_age_adj$age_std_prev, 100)
+
+
 # Merging at CCG 
 ccg_grouped <- merge(lsoa_age_adj, lsoa_ccg_la, by.x = 'lsoa_code', by.y = 'LSOA11CD') 
 
@@ -234,7 +240,7 @@ mean(lsoa_grouped$obs_hyper_prev) # 14.30%
 median(lsoa_grouped$obs_hyper_prev) #14.55%
 
 # Age Standardised Dataframe 
-mean(lsoa_age_adj$age_std_prev) # 15.22
+mean(lsoa_age_adj$age_std_prev) # 15.11
 
 #### Plotting ####
 # Creating a Shapefile to plot prevalence by LSOA
@@ -242,8 +248,8 @@ hyper_prev_shp <- merge(ENG_LSOA11, lsoa_age_adj, by.x = 'geo_code', by.y = 'lso
 
 tm_shape(hyper_prev_shp) + 
   tm_polygons(col = 'age_std_prev', border.alpha = 0.5, title = "Age Std. Prev.", 
-              legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
-              lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) + 
+              legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, Inf), 
+              lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25+")) + 
   tm_compass(position = c("right", "top")) + 
   tm_scale_bar(position = c("right", "bottom")) + 
   tm_layout(main.title = "Age Standardised Hypertension Prevalence Rate", legend.outside = TRUE)
@@ -288,9 +294,22 @@ ccg_agg <- ccg_grouped %>%
 ccg_agg_shp <- merge(Eng_CCG, ccg_agg, by = c('CCG21CD', 'CCG21NM'))
 ccg_agg_region <- merge(ccg_agg_shp, ccg_region) 
 
+# Creating Deciles for CCGs 
+ccg_agg_region$percentile <- ntile(ccg_agg_region$age_std_prev_21_22, 100)
+
+tm_shape(ccg_agg_shp) + 
+  tm_polygons(col = "age_std_prev_21_22", palette ="-RdBu", title = "Age Std. Prevalence %", 
+              legend.hist = TRUE) +
+  tm_compass(position = c("left", "top")) + 
+  tm_scale_bar() +
+  tm_layout("Age Std. Hypertension Prevalence by CCG", legend.outside = TRUE)
+
 top10_ccg <- ccg_agg_region %>%
-  arrange(desc(age_std_prev_21_22)) %>%
-  slice(1:11)
+  filter(percentile >= 91)
+
+bottom5_ccg <- ccg_agg_region %>%
+  arrange(age_std_prev_21_22) %>%
+  slice(1:5)
 
 # Plotting the Top Decile of CCGs by Prevalence
 ggplot(top10_ccg, aes(x = reorder(CCG21NM, -age_std_prev_21_22), y = age_std_prev_21_22)) + 
@@ -299,6 +318,15 @@ ggplot(top10_ccg, aes(x = reorder(CCG21NM, -age_std_prev_21_22), y = age_std_pre
   theme(legend.position = "none") + 
   labs(x = "CCG", y = "Age Standardised Prevalence Rate (%)", 
        title = "Hypertension Prevalence Distribution Amongst Top 10% of CCGs")
+
+tm_shape(Eng_CCG) + 
+  tm_borders(col = "black") +
+tm_shape(top10_ccg) + 
+  tm_fill(col = "#B2182B") +
+  tm_compass(position = c("left", "top")) + 
+  tm_scale_bar() + 
+  tm_layout(main.title = "Top 10th Percentile of Prevalence CCGs")
+
 
 # Plotting how many CCGs in each Region are Above National Average
 ggplot(ccg_agg_region, aes(x = fct_infreq(NHSER21NM), y = above_average, fill = NHSER21NM)) + 
@@ -423,9 +451,9 @@ ggplot(midlands_ccg_hyper) +
 tm_shape(midlands_ccg_hyper) +
   tm_fill(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
           legend.hist = TRUE, 
-          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#F7F7F7", "#FDDBC7", "#D6604D", "#B2182B"), 
-          breaks = c(0, 5, 10, 15, 20, 25, 30, Inf), 
-          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30+")) +
+          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#FDDBC7", "#D6604D", "#B2182B"), 
+          breaks = c(0,10, 12.5, 15, 17.5, 20, Inf), 
+          lables = c("<10", "10-12.5", "12.5-15", "15-17.5", "17.5-20", "20+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in the Midlands', legend.outside = TRUE) +
 tm_shape(midlands_ccg) +
@@ -459,9 +487,9 @@ ggplot(north_east_ccg_hyper) +
 tm_shape(north_east_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
           legend.hist = TRUE,  
-          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#F7F7F7", "#FDDBC7", "#D6604D", "#B2182B"), 
-          breaks = c(0, 5, 10, 15, 20, 25, 30, Inf), 
-          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30+")) + 
+          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#FDDBC7", "#D6604D", "#B2182B"), 
+          breaks = c(0,10, 12.5, 15, 17.5, 20, Inf), 
+          lables = c("<10", "10-12.5", "12.5-15", "15-17.5", "17.5-20", "20+")) + 
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in NE England', legend.outside = TRUE) +
 tm_shape(north_east_ccg) +
@@ -494,9 +522,9 @@ ggplot(north_west_ccg_hyper) +
 tm_shape(north_west_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
           legend.hist = TRUE,  
-          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#F7F7F7", "#FDDBC7", "#D6604D", "#B2182B"), 
-          breaks = c(0, 5, 10, 15, 20, 25, 30, Inf), 
-          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30+")) +
+          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#FDDBC7", "#D6604D", "#B2182B"), 
+          breaks = c(0,10, 12.5, 15, 17.5, 20, Inf), 
+          lables = c("<10", "10-12.5", "12.5-15", "15-17.5", "17.5-20", "20+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in NW England', legend.outside = TRUE) +
 tm_shape(north_west_ccg) +
@@ -529,9 +557,9 @@ ggplot(london_ccg_hyper) +
 tm_shape(london_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
               legend.hist = TRUE, 
-          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#F7F7F7", "#FDDBC7", "#D6604D", "#B2182B"), 
-          breaks = c(0, 5, 10, 15, 20, 25, 30, Inf), 
-          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30+")) +
+          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#FDDBC7", "#D6604D", "#B2182B"), 
+          breaks = c(0,10, 12.5, 15, 17.5, 20, Inf), 
+          lables = c("<10", "10-12.5", "12.5-15", "15-17.5", "17.5-20", "20+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in London', legend.outside = TRUE) +
 tm_shape(london_ccg) +
@@ -564,9 +592,9 @@ ggplot(south_east_ccg_hyper) +
 tm_shape(south_east_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
           legend.hist = TRUE, 
-          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#F7F7F7", "#FDDBC7", "#D6604D", "#B2182B"), 
-          breaks = c(0, 5, 10, 15, 20, 25, 30, Inf), 
-          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30+")) +
+          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#FDDBC7", "#D6604D", "#B2182B"), 
+          breaks = c(0,10, 12.5, 15, 17.5, 20, Inf), 
+          lables = c("<10", "10-12.5", "12.5-15", "15-17.5", "17.5-20", "20+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in SE England', legend.outside = TRUE) +
 tm_shape(south_east_ccg) +
@@ -599,9 +627,9 @@ ggplot(south_west_ccg_hyper) +
 tm_shape(south_west_ccg_hyper) +
   tm_fill(col = 'age_std_prev', title = "Hypertension Prevalence %", 
           legend.hist = TRUE, 
-          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#F7F7F7", "#FDDBC7", "#D6604D", "#B2182B"), 
-          breaks = c(0, 5, 10, 15, 20, 25, 30, Inf), 
-          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30+")) +
+          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#FDDBC7", "#D6604D", "#B2182B"), 
+          breaks = c(0,10, 12.5, 15, 17.5, 20, Inf), 
+          lables = c("<10", "10-12.5", "12.5-15", "15-17.5", "17.5-20", "20+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in SW England', legend.outside = TRUE) +
 tm_shape(south_west_ccg) +
@@ -634,9 +662,9 @@ ggplot(east_eng_ccg_hyper) +
 tm_shape(east_eng_ccg_hyper) +
   tm_fill(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
           legend.hist = TRUE,
-          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#F7F7F7", "#FDDBC7", "#D6604D", "#B2182B"), 
-          breaks = c(0, 5, 10, 15, 20, 25, 30, Inf), 
-          lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30+")) +
+          palette = c("#2166AC", "#4393C3", "#D1E5F0", "#FDDBC7", "#D6604D", "#B2182B"), 
+          breaks = c(0,10, 12.5, 15, 17.5, 20, Inf), 
+          lables = c("<10", "10-12.5", "12.5-15", "15-17.5", "17.5-20", "20+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in East England', legend.outside = TRUE) +
 tm_shape(east_eng_ccg) +
@@ -1245,7 +1273,7 @@ hse_hyp_prev <- read_csv("hypertension_prevalence_estimate_HSE.csv") %>%
   clean_names()
 
 # Age Standardising HSE data 
-hse_hyper_prev <- merge(GP_age_dist_cl, hse_hyp_prev, by.x = 'area_code', by.y = 'code') %>%
+hse_hyper_prev <- merge(GP_age_dist_cl, hse_hyp_prev, by.x = 'org_code', by.y = 'code') %>%
   # Create new column for the percentage of patients a GP serves in each LSOA 
   mutate(hse_exp_hyp = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100)
 
@@ -1280,7 +1308,6 @@ regional_abs_undiagnosed <- merge(sub_icb_abs, ccg_region, by.x = 'sub_icb_loc_o
             region_population = sum(sub_icb_pop)) %>%
   mutate(rate_per_100000 = round(tot_undiagnosed/(region_population/100000), digits = 2), 
          undiagnosed_prev = round(tot_undiagnosed/region_population*100, digits = 2))
-
 
 #### Objective 3 ####
 #### Loading in QOF data from 2014-15 to 2019-20 ####
@@ -2214,6 +2241,132 @@ hyper_prev_20_21 <- merge(ccg_age_dist_21, Hyper20_21_cl, by = 'ccg_code') %>%
          tot_list_size_20_21, tot_register_20_21, 
          obs_over_exp_21, age_std_prev_20_21)
 
+# 2021-22
+Hyper21_22_ccg <- Hyper21_22 %>%
+  group_by(sub_icb_loc_ods_code) %>%
+  summarise(tot_list_size_21_22 = sum(list_size_21_22), 
+            tot_register_21_22 = sum(register_21_22), 
+            avg_prevalence_21_22 = mean(prevalence_percent_21_22), 
+            tot_u79_numerator_21_22 = sum(under79_numerator_21_22), 
+            tot_u79_denominator_21_22 = sum(under79_denominator_21_22),
+            avg_u79_achievement_21_22 = mean(under79_achievement_net_exceptions_21_22), 
+            avg_u79_intervention_21_22 = mean(under79_percent_receiving_intervention_21_22), 
+            tot_o80_numerator_21_22 = sum(over80_numerator_21_22), 
+            tot_o80_denominator_21_22 = sum(over80_denominator_21_22), 
+            avg_o80_achievement_21_22 = mean(over80_achievement_net_exceptions_21_22), 
+            avg_o80_intervention_21_22 = mean(over80_percent_receiving_intervention_21_22))
+
+age_dist_22 <- read_csv("~/Hypertension/Population Age Distributions/gp-reg-pat-prac-quin-age-sep-22.csv") %>%
+  clean_names() 
+
+age_dist_22_cl <- age_dist_22 %>%
+  filter(org_type == "SUB_ICB_LOCATION") %>%
+  pivot_wider(names_from = c(age_group_5, sex), 
+              values_from = number_of_patients) %>%
+  clean_names() %>%
+  rename(ccg_code = org_code)
+
+# Separating Data into Respective Age Groups
+age_dist_22_cl <- age_dist_22_cl %>%
+  mutate(male0_15 = rowSums(select(., x0_4_male:x10_14_male)), 
+         male16_24 = rowSums(select(., x15_19_male:x20_24_male)), 
+         male25_34 = rowSums(select(., x25_29_male:x30_34_male)), 
+         male35_44 = rowSums(select(., x35_39_male:x40_44_male)), 
+         male45_54 = rowSums(select(., x45_49_male:x50_54_male)), 
+         male55_64 = rowSums(select(., x55_59_male:x60_64_male)), 
+         male65_74 = rowSums(select(., x65_69_male:x70_74_male)), 
+         male75plus = rowSums(select(., x75_79_male:x95_male)), 
+         female0_15 = rowSums(select(., x0_4_female:x10_14_female)), 
+         female16_24 = rowSums(select(., x15_19_female:x20_24_female)), 
+         female25_34 = rowSums(select(., x25_29_female:x30_34_female)), 
+         female35_44 = rowSums(select(., x35_39_female:x40_44_female)), 
+         female45_54 = rowSums(select(., x45_49_female:x50_54_female)), 
+         female55_64 = rowSums(select(., x55_59_female:x60_64_female)), 
+         female65_74 = rowSums(select(., x65_69_female:x70_74_female)), 
+         female75plus = rowSums(select(., x75_79_female:x95_female))) %>%
+  select(ccg_code, all_all, all_male, all_female, male0_15, male16_24, male25_34, male35_44, male45_54, 
+         male55_64, male65_74, male75plus, female0_15, female16_24, female25_34, female35_44, female45_54, female55_64, 
+         female65_74, female75plus)
+
+# Aggregating data at CCG level
+ccg_age_dist_22 <- age_dist_22_cl %>%
+  group_by(ccg_code) %>%
+  summarise(total_all = sum(all_all), 
+            total_male = sum(all_male), 
+            total_female = sum(all_female), 
+            male0_15 = sum(male0_15), 
+            male16_24 = sum(male16_24), 
+            male25_34 = sum(male25_34), 
+            male35_44 = sum(male35_44), 
+            male45_54 = sum(male45_54), 
+            male55_64 = sum(male55_64), 
+            male65_74 = sum(male65_74), 
+            male75plus = sum(male75plus), 
+            female0_15 = sum(female0_15), 
+            female16_24 = sum(female16_24), 
+            female25_34 = sum(female25_34), 
+            female35_44 = sum(female35_44), 
+            female45_54 = sum(female45_54), 
+            female55_64 = sum(female55_64), 
+            female65_74 = sum(female65_74), 
+            female75plus = sum(female75plus))
+
+# Converting raw totals into percentages
+ccg_age_dist_22 <- ccg_age_dist_22 %>%
+  mutate(male0_15_perc = male0_15/total_male, 
+         male16_24_perc = male16_24/total_male, 
+         male25_34_perc = male25_34/total_male, 
+         male35_44_perc = male35_44/total_male, 
+         male45_54_perc = male45_54/total_male, 
+         male55_64_perc = male55_64/total_male, 
+         male65_74_perc = male65_74/total_male, 
+         male75plus_perc = male75plus/total_male,
+         female0_15_perc = female0_15/total_female,
+         female16_24_perc = female16_24/total_female, 
+         female25_34_perc = female25_34/total_female, 
+         female35_44_perc = female35_44/total_female, 
+         female45_54_perc = female45_54/total_female, 
+         female55_64_perc = female55_64/total_female, 
+         female65_74_perc = female65_74/total_female, 
+         female75plus_perc = female75plus/total_female, 
+         perc_male = total_male/total_all, 
+         perc_female = total_female/total_all)
+
+# calculating expected rates of hypertension 
+ccg_age_dist_22 <- ccg_age_dist_22 %>%
+  mutate(exp_hyp_16_24_male = male16_24_perc*0.01, 
+         exp_hyp_25_34_male = male25_34_perc*0.01, 
+         exp_hyp_35_44_male = male35_44_perc*0.03, 
+         exp_hyp_45_54_male = male45_54_perc*0.11, 
+         exp_hyp_55_64_male = male55_64_perc*0.26, 
+         exp_hyp_65_74_male = male65_74_perc*0.38,
+         exp_hyp_75plus_male = male75plus_perc*0.53,
+         exp_hyp_16_24_female = female16_24_perc*0.00, 
+         exp_hyp_25_34_female = female25_34_perc*0.01, 
+         exp_hyp_35_44_female = female35_44_perc*0.02, 
+         exp_hyp_45_54_female = female45_54_perc*0.09, 
+         exp_hyp_55_64_female = female55_64_perc*0.19, 
+         exp_hyp_65_74_female = female65_74_perc*0.32,
+         exp_hyp_75plus_female = female75plus_perc*0.46, 
+         exp_hyp_male_21_22 = exp_hyp_16_24_male + exp_hyp_25_34_male + exp_hyp_35_44_male + exp_hyp_45_54_male + 
+           exp_hyp_55_64_male + exp_hyp_65_74_male + exp_hyp_75plus_male, 
+         exp_hyp_female_21_22 = exp_hyp_16_24_female + exp_hyp_25_34_female + exp_hyp_35_44_female + exp_hyp_45_54_female +
+           exp_hyp_55_64_female + exp_hyp_65_74_female + exp_hyp_75plus_female)
+
+# getting expected rate for each ccg adjusted for age and gender
+ccg_age_dist_22 <- ccg_age_dist_22 %>%
+  mutate(exp_hyp_21_22 = (exp_hyp_male_21_22*perc_male + exp_hyp_female_21_22*perc_female)*100)
+
+hyper_prev_21_22 <- merge(ccg_age_dist_22, Hyper21_22_ccg, by.x = 'ccg_code', by.y = "sub_icb_loc_ods_code") %>%
+  # Creating Ratios and Age Standardising
+  mutate(obs_over_exp_22 = avg_prevalence_21_22/exp_hyp_21_22, 
+         age_std_prev_21_22 = mean(avg_prevalence_21_22)*obs_over_exp_22) %>%
+  # selecting variables 
+  select(ccg_code, avg_prevalence_21_22, exp_hyp_21_22, exp_hyp_male_21_22, exp_hyp_female_21_22,
+         tot_list_size_21_22, tot_register_21_22, tot_u79_numerator_21_22, tot_u79_denominator_21_22, 
+         avg_u79_achievement_21_22, avg_u79_intervention_21_22, tot_o80_numerator_21_22, 
+         tot_o80_denominator_21_22, avg_o80_achievement_21_22, avg_o80_intervention_21_22,
+         obs_over_exp_22, age_std_prev_21_22)
 
 # Load in Data to Change the CCG Codes
 ccg_2019_codes <- read_csv("~/Hypertension/CCG merge data/merges_up_to_2019.csv") %>%
@@ -2293,10 +2446,10 @@ QOF_20_to_21 <- QOF_20_data %>%
 QOF_21 <- merge(QOF_20_to_21, hyper_prev_20_21, by.x = "new_code", by.y = 'ccg_code', all = TRUE) %>%
   rename(ccg_code = new_code)
   
-QOF_22 <- merge(QOF_21, ccg_agg, by.x = 'ccg_code', by.y = 'CCG21CDH', all = TRUE) 
+QOF_22 <- merge(QOF_21, hyper_prev_21_22, by = 'ccg_code', all = TRUE) 
 
 QOF_prev <- QOF_22 %>%
-  group_by(ccg_code, CCG21CD, CCG21NM) %>%
+  group_by(ccg_code) %>%
   summarise(obsprev_15 = mean(avg_prevalence_14_15, na.rm = TRUE), 
             expprev_15 = mean(exp_hyp_14_15, na.rm = TRUE),
             agestdprev_15 = mean(age_std_prev_14_15, na.rm = TRUE),
@@ -2325,16 +2478,16 @@ QOF_prev <- QOF_22 %>%
             expprev_21 = mean(exp_hyp_20_21, na.rm = TRUE), 
             agestdprev_21 = mean(age_std_prev_20_21, na.rm = TRUE), 
             obs_exp_ratio_21 = mean(obs_over_exp_21, na.rm = TRUE), 
-            patients_22 = mean(lsoa_pop_21_22, na.rm = TRUE),
             obsprev_22 = mean(avg_prevalence_21_22, na.rm = TRUE), 
             expprev_22 = mean(exp_hyp_21_22, na.rm = TRUE), 
             agestdprev_22 = mean(age_std_prev_21_22, na.rm = TRUE), 
-            obs_exp_ratio_22 = mean(obs_over_exp_22, na.rm = TRUE))
+            obs_exp_ratio_22 = mean(obs_over_exp_22, na.rm = TRUE),
+            )
 
-#### Interupted Time Series Analysis ####
+#### Interrupted Time Series Analysis ####
 # Transforming the Data for ITS purposes 
 QOF_prev_long <- QOF_prev %>%
-  pivot_longer(!c(ccg_code, CCG21CD, CCG21NM, patients_22),
+  pivot_longer(!ccg_code,
                names_to = c("category", "year"),
                names_pattern = "([A-Za-z]+)_(\\d+)", # separates variables by characters and then numbers, similar to name_sep but more sophisticated
                values_to = "score")
@@ -2354,6 +2507,9 @@ QOF_prev_cl <- QOF_prev_long %>%
 QOF_prev_14_19 <- QOF_prev_cl %>%
   filter(., year <=  5)
 
+QOF_prev_21_22 <- QOF_prev_cl %>%
+  filter(., year >= 6)
+
 # performing ITS 
 itsa <- lm(age_std_prevalence ~ year + covid + year*covid, data = QOF_prev_cl)
 summary(itsa)
@@ -2366,14 +2522,43 @@ summary(year_reg)
 covid_yr_regression <- lm(age_std_prevalence ~ year + covid, dat = QOF_prev_cl)
 summary(covid_yr_regression)
 
+## Using Predict
+model <- lm(age_std_prevalence ~ year + as.factor(ccg_code), data = subset(QOF_prev_cl, year < 6))
+predicted_output <- predict(model, subset(QOF_prev_cl, year >=6))
+
+# Converting to dataframe
+predicted_output <- as.data.frame(predicted_output)
+year_20_21 <- predicted_output[seq(from = 1, to = 106, by = 1), 1]
+year_21_22 <- predicted_output[seq(from = 107, to = 212, by= 1), 1]
+
+pred_output_two_yr <- data.frame(year_20_21, year_21_22)
+QOF_prev_21_22$predicted_age_std_prev <- predict(model, subset(QOF_prev_cl, year >=6))
+
+QOF_prev_21_22 <- QOF_prev_21_22 %>%
+  mutate(age_std_prev_diff = age_std_prevalence-predicted_age_std_prev)
+
+
+### Coding CCG population ###
+lsoa_pop_from_GP <- GP_lsoa_dist %>%
+  group_by(lsoa_code) %>%
+  summarise(lsoa_pop = sum(number_of_patients))
+
+lsoa_ccg_pop_merge <- merge(lsoa_pop_from_GP, lsoa_ccg_la, by.x = 'lsoa_code', by.y = 'LSOA11CD')
+
+ccg_pop <- lsoa_ccg_pop_merge %>%
+  group_by(CCG21CD, CCG21CDH, CCG21NM) %>%
+  summarise(sub_icb_pop = sum(lsoa_pop))
+
+QOF_prev_pop <- merge(QOF_prev_21_22, ccg_pop, by.x = 'ccg_code', by.y = 'CCG21CDH')
+
 # Finding what the average yearly increase in prevalence is from 2014-15 to 2017-18 
 fit_14_19 <- lm(age_std_prevalence ~ year, data = QOF_prev_14_19)
 summary(fit_14_19)
 
 # Fitting the yearly increase (0.11226) to the 2019 data to account for the change in prevalence 
 # When shifted to include 2019 (as the threshold change doesn't impact prevalance), coefficient = 0.12606
-QOF_prev_20_22 <- QOF_prev %>%
-  select(CCG21CD, agestdprev_20, agestdprev_21, agestdprev_22, patients_22)
+QOF_prev_21_22 <- QOF_prev_pop %>%
+  select(ccg_code, CCG21CD, CCG21NM, agestdprev_20, agestdprev_21, agestdprev_22, sub_icb_pop)
 
 # Calculating the expected prevalence 
 QOF_prev_20_22 <- QOF_prev_20_22 %>%
@@ -2386,7 +2571,7 @@ QOF_prev_20_22 <- QOF_prev_20_22 %>%
   
 
 # plotting differences
-prev_diff_shp <- merge(Eng_CCG, QOF_prev_20_22, by = 'CCG21CD') 
+prev_diff_shp <- merge(Eng_CCG, QOF_prev_pop, by = c('CCG21CD', 'CCG21NM')) 
 
 # 2021 difference
 tm_shape(prev_diff_shp) + 
@@ -2405,9 +2590,15 @@ tm_shape(prev_diff_shp) +
 # Finding Absolute Values in Differences
 # calculate absolute totals
 abs_hyper_shp <- prev_diff_shp %>%
-  mutate(undiagnosed_21 = (age_std_prev_diff_21/100)*patients_22, 
-         undiagnosed_22 = case_when(age_std_prev_diff_22 > 0 ~ ((age_std_prev_diff_22+age_std_prev_diff_21)/100)*patients_22, 
-                                    T ~ ((age_std_prev_diff_22-age_std_prev_diff_21)/100)*patients_22))
+  mutate(undiagnosed = round(age_std_prev_diff*sub_icb_pop/100, digits = 0))
+
+missed_21 <- abs_hyper_shp %>%
+  filter(year == 6) %>%
+  select(., -c(year, covid, OBJECTID:SHAPE_Area))
+
+missed_22 <- abs_hyper_shp %>%
+  filter(year == 7) %>%
+  select(., -c(year, covid, OBJECTID:SHAPE_Area))
 
 # Merge all the undiagnosed data into one column 
 abs_hyper_long <- abs_hyper_shp %>%
