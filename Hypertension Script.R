@@ -13,6 +13,33 @@ library(RColorBrewer)
 #### Loading Data #####
 # Loading in Shapefile
 Eng_CCG <- st_read("~/Hypertension/CCG Geography/CCG_APR_2021_EN_BFC.shp")
+
+# Renaming and Recoding CCG labels following the most recent changes to CCG/ICB names
+# Northamptonshire
+Eng_CCG$CCG21CD[Eng_CCG$CCG21CD=="E38000242"] <- "E38000262"
+Eng_CCG$CCG21NM[Eng_CCG$CCG21NM=="NHS Northamptonshire CCG"] <- "NHS Northamptonshire ICB"
+
+# Greater Manchester 
+Eng_CCG$CCG21CD[Eng_CCG$CCG21CD=="E38000182"] <- "E38000263"
+Eng_CCG$CCG21NM[Eng_CCG$CCG21NM=="NHS Tameside and Glossop CCG"] <- "NHS Greater Manchester ICB"
+
+# Cambridgeshire and Peterborough 
+Eng_CCG$CCG21CD[Eng_CCG$CCG21CD=="E38000026"] <- "E38000260"
+Eng_CCG$CCG21NM[Eng_CCG$CCG21NM=="NHS Cambridgeshire and Peterborough CCG"] <- "NHS Cambridgeshire and Peterborough ICB"
+
+# Derby and Derbyshire 
+Eng_CCG$CCG21CD[Eng_CCG$CCG21CD=="E38000229"] <- "E38000261"
+Eng_CCG$CCG21NM[Eng_CCG$CCG21NM=="NHS Derby and Derbyshire CCG"] <- "NHS Derby and Derbyshire ICB"
+
+# Black Country
+Eng_CCG$CCG21CD[Eng_CCG$CCG21CD=="E38000250"] <- "E38000259"
+Eng_CCG$CCG21NM[Eng_CCG$CCG21NM=="NHS Black Country and West Birmingham CCG"] <- "NHS Black Country ICB"
+
+# Birmingham and Solihull
+Eng_CCG$CCG21CD[Eng_CCG$CCG21CD=="E38000220"] <- "E38000258"
+Eng_CCG$CCG21NM[Eng_CCG$CCG21NM=="NHS Birmingham and Solihull CCG"] <- "NHS Birmingham and Solihull ICB"
+
+
 ENG_LSOA21 <- st_read("~/Hypertension/LSOA Shapefiles/LSOA_2021_EW_BFE_V5.shp")
 ENG_LSOA11 <- st_read("~/Hypertension/LSOA Shapefiles/infuse_lsoa_lyr_2011.shp") %>% 
   filter(str_detect(geo_code, '^E'))
@@ -153,10 +180,58 @@ GP_lsoa_data <- GP_lsoa_dist %>%
 # Loading in some files for aggregating geography upwards
 lsoa_ccg_la <- read_csv("LSOA_to_CCG_to_LAD_(April_2021)_Lookup_in_England.csv")
 
+# Renaming and Recoding CCG labels following the most recent changes to CCG/ICB names
+# Northamptonshire
+lsoa_ccg_la$CCG21CD[lsoa_ccg_la$CCG21CD=="E38000242"] <- "E38000262"
+lsoa_ccg_la$CCG21NM[lsoa_ccg_la$CCG21NM=="NHS Northamptonshire CCG"] <- "NHS Northamptonshire ICB"
+
+# Greater Manchester 
+lsoa_ccg_la$CCG21CD[lsoa_ccg_la$CCG21CD=="E38000182"] <- "E38000263"
+lsoa_ccg_la$CCG21NM[lsoa_ccg_la$CCG21NM=="NHS Tameside and Glossop CCG"] <- "NHS Greater Manchester ICB"
+
+# Cambridgeshire and Peterborough 
+lsoa_ccg_la$CCG21CD[lsoa_ccg_la$CCG21CD=="E38000026"] <- "E38000260"
+lsoa_ccg_la$CCG21NM[lsoa_ccg_la$CCG21NM=="NHS Cambridgeshire and Peterborough CCG"] <- "NHS Cambridgeshire and Peterborough ICB"
+
+# Derby and Derbyshire 
+lsoa_ccg_la$CCG21CD[lsoa_ccg_la$CCG21CD=="E38000229"] <- "E38000261"
+lsoa_ccg_la$CCG21NM[lsoa_ccg_la$CCG21NM=="NHS Derby and Derbyshire CCG"] <- "NHS Derby and Derbyshire ICB"
+
+# Black Country
+lsoa_ccg_la$CCG21CD[lsoa_ccg_la$CCG21CD=="E38000250"] <- "E38000259"
+lsoa_ccg_la$CCG21NM[lsoa_ccg_la$CCG21NM=="NHS Black Country and West Birmingham CCG"] <- "NHS Black Country ICB"
+
+# Birmingham and Solihull
+lsoa_ccg_la$CCG21CD[lsoa_ccg_la$CCG21CD=="E38000220"] <- "E38000258"
+lsoa_ccg_la$CCG21NM[lsoa_ccg_la$CCG21NM=="NHS Birmingham and Solihull CCG"] <- "NHS Birmingham and Solihull ICB"
+
 ccg_region <- read_csv("CCG_to_STP_and_NHS_England_(Region)_(April_2021)_Lookup_in_England.csv") %>%
   subset(., select = c(CCG21CD, CCG21CDH, CCG21NM, NHSER21CD, NHSER21NM))
 
-# Checking what LSOA's don't merge, as there is a difference between the two lists
+# Renaming and Recoding CCG labels following the most recent changes to CCG/ICB names
+# Northamptonshire
+ccg_region$CCG21CD[ccg_region$CCG21CD=="E38000242"] <- "E38000262"
+ccg_region$CCG21NM[ccg_region$CCG21NM=="NHS Northamptonshire CCG"] <- "NHS Northamptonshire ICB"
+
+# Greater Manchester 
+ccg_region$CCG21CD[ccg_region$CCG21CD=="E38000182"] <- "E38000263"
+ccg_region$CCG21NM[ccg_region$CCG21NM=="NHS Tameside and Glossop CCG"] <- "NHS Greater Manchester ICB"
+
+# Cambridgeshire and Peterborough 
+ccg_region$CCG21CD[ccg_region$CCG21CD=="E38000026"] <- "E38000260"
+ccg_region$CCG21NM[ccg_region$CCG21NM=="NHS Cambridgeshire and Peterborough CCG"] <- "NHS Cambridgeshire and Peterborough ICB"
+
+# Derby and Derbyshire 
+ccg_region$CCG21CD[ccg_region$CCG21CD=="E38000229"] <- "E38000261"
+ccg_region$CCG21NM[ccg_region$CCG21NM=="NHS Derby and Derbyshire CCG"] <- "NHS Derby and Derbyshire ICB"
+
+# Black Country
+ccg_region$CCG21CD[ccg_region$CCG21CD=="E38000250"] <- "E38000259"
+ccg_region$CCG21NM[ccg_region$CCG21NM=="NHS Black Country and West Birmingham CCG"] <- "NHS Black Country ICB"
+
+# Birmingham and Solihull
+ccg_region$CCG21CD[ccg_region$CCG21CD=="E38000220"] <- "E38000258"
+ccg_region$CCG21NM[ccg_region$CCG21NM=="NHS Birmingham and Solihull CCG"] <- "NHS Birmingham and Solihull ICB"
 
 #### Objective One #####
 # Loading in Hypertension Prevalence Data 
@@ -305,7 +380,8 @@ tm_shape(ccg_agg_shp) +
   tm_layout("Age Std. Hypertension Prevalence by CCG", legend.outside = TRUE)
 
 top10_ccg <- ccg_agg_region %>%
-  filter(percentile >= 91)
+  filter(percentile >= 91) %>%
+  select(-c(OBJECTID:SHAPE_Area))
 
 bottom5_ccg <- ccg_agg_region %>%
   arrange(age_std_prev_21_22) %>%
@@ -1266,7 +1342,7 @@ regional_hyper <- ccg_data %>%
             female_prev65_74 = mean(exp_hyp_65_74_female*female65_74_perc*100), 
             female_prev75plus = mean(exp_hyp_75plus_female*female75plus_perc*100))
 
-#### Objective 2 ####
+ #### Objective 2 ####
 # Comparing QOF Prevalence to HSE Prevalence by GP 
 # Loading in HSE GP Prevalence data 
 hse_hyp_prev <- read_csv("hypertension_prevalence_estimate_HSE.csv") %>%
@@ -1290,15 +1366,15 @@ undiagnosed_hyp_prev <- hse_qof_comp %>%
 abs_gp_hyper <- merge(undiagnosed_hyp_prev, GP_lsoa_data, by = 'practice_code', all.y = TRUE) %>%
   # selecting variables of interest 
   select(practice_code, practice_name, number_of_patients, hse_prevalence, prevalence_percent_21_22, undiagnosed_hyp,
-         sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
+         lsoa_code, lsoa_pop, sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
   # Calculating total undiagnosed by GP 
-  mutate(undiagnosed_totals = (undiagnosed_hyp/100)*number_of_patients)
+  mutate(undiagnosed_totals = (undiagnosed_hyp/100)*number_of_patients, 
+         gp_coverage = number_of_patients/lsoa_pop)
 
 # Aggregating at ICS level
 sub_icb_abs <- abs_gp_hyper %>%
   group_by(sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
   summarise(undiagnosed_hypertension = round(sum(undiagnosed_totals, na.rm = TRUE),digits = 0), 
-            avg_undiagnosed_percent = mean(undiagnosed_hyp, na.rm = TRUE),
             sub_icb_pop = sum(number_of_patients))
 
 # Aggregating at Regional Level
@@ -2503,10 +2579,7 @@ QOF_prev_cl <- QOF_prev_long %>%
   mutate(covid = case_when(year >= 21 ~ 1, T ~ 0), 
          year = year - 15) # creating dummy variable for the covid years 
 
-# Subsetting for the First Four Years
-QOF_prev_14_19 <- QOF_prev_cl %>%
-  filter(., year <=  5)
-
+# Subsetting for just the COVID years 
 QOF_prev_21_22 <- QOF_prev_cl %>%
   filter(., year >= 6)
 
@@ -2549,26 +2622,31 @@ ccg_pop <- lsoa_ccg_pop_merge %>%
   group_by(CCG21CD, CCG21CDH, CCG21NM) %>%
   summarise(sub_icb_pop = sum(lsoa_pop))
 
-QOF_prev_pop <- merge(QOF_prev_21_22, ccg_pop, by.x = 'ccg_code', by.y = 'CCG21CDH')
+QOF_prev_pop <- merge(QOF_prev_21_22, ccg_pop, by.x = 'ccg_code', by.y = 'CCG21CDH') %>%
+  # Calculating undiagnosed absolute totals from extrapolated population
+  mutate(undiagnosed = round(age_std_prev_diff*sub_icb_pop/100, digits = 0)) 
 
-# Finding what the average yearly increase in prevalence is from 2014-15 to 2017-18 
-fit_14_19 <- lm(age_std_prevalence ~ year, data = QOF_prev_14_19)
-summary(fit_14_19)
 
-# Fitting the yearly increase (0.11226) to the 2019 data to account for the change in prevalence 
-# When shifted to include 2019 (as the threshold change doesn't impact prevalance), coefficient = 0.12606
-QOF_prev_21_22 <- QOF_prev_pop %>%
-  select(ccg_code, CCG21CD, CCG21NM, agestdprev_20, agestdprev_21, agestdprev_22, sub_icb_pop)
+# Finding Absolute Values in Differences
+missed_21 <- QOF_prev_pop %>%
+  filter(year == 6) %>%
+  select(., -c(exp_prevalence, ratio, year, covid)) %>%
+  rename(obs_prev_21 = obs_prevalence, 
+         age_std_prev_21 = age_std_prevalence, 
+         pred_age_std_prev_21 = predicted_age_std_prev, 
+         age_std_prev_diff_21 = age_std_prev_diff,
+         undiagnosed_21 = undiagnosed)
 
-# Calculating the expected prevalence 
-QOF_prev_20_22 <- QOF_prev_20_22 %>%
-  mutate(exp_age_std_prev_21 = agestdprev_20 + 0.12606, 
-         exp_age_std_prev_22 = agestdprev_20 + 0.12606*2, 
-         # Now calculating the difference between the expected change and obs change to get the covid effect
-         age_std_prev_diff_21 = case_when(agestdprev_21 - exp_age_std_prev_21 <= 0 ~ agestdprev_21 - exp_age_std_prev_21,
-                                          T ~ 0),
-         age_std_prev_diff_22 = (agestdprev_22-agestdprev_21) - (exp_age_std_prev_22-exp_age_std_prev_21))
-  
+missed_22 <- QOF_prev_pop %>%
+  filter(year == 7) %>%
+  select(., -c(exp_prevalence, ratio, year, covid)) %>%
+  rename(obs_prev_22 = obs_prevalence, 
+         age_std_prev_22 = age_std_prevalence, 
+         pred_age_std_prev_22 = predicted_age_std_prev, 
+         age_std_prev_diff_22 = age_std_prev_diff,
+         undiagnosed_22 = undiagnosed)
+
+missed_all <- merge(missed_21, missed_22, by = c("ccg_code", "CCG21CD", "CCG21NM", "sub_icb_pop"))
 
 # plotting differences
 prev_diff_shp <- merge(Eng_CCG, QOF_prev_pop, by = c('CCG21CD', 'CCG21NM')) 
@@ -2587,29 +2665,10 @@ tm_shape(prev_diff_shp) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Unreported Hypertension in the UK (2022)', legend.outside = TRUE) 
 
-# Finding Absolute Values in Differences
-# calculate absolute totals
-abs_hyper_shp <- prev_diff_shp %>%
-  mutate(undiagnosed = round(age_std_prev_diff*sub_icb_pop/100, digits = 0))
-
-missed_21 <- abs_hyper_shp %>%
-  filter(year == 6) %>%
-  select(., -c(year, covid, OBJECTID:SHAPE_Area))
-
-missed_22 <- abs_hyper_shp %>%
-  filter(year == 7) %>%
-  select(., -c(year, covid, OBJECTID:SHAPE_Area))
-
-# Merge all the undiagnosed data into one column 
-abs_hyper_long <- abs_hyper_shp %>%
-  pivot_longer(cols = starts_with("undiagnosed"), 
-               names_to = "year", names_prefix = "undiagnosed_", 
-               values_to = "undiagnosed_totals") 
-
 # merge to regional data 
-abs_hyper_region <- full_join(abs_hyper_long, ccg_region)
+abs_hyper_region <- full_join(missed_all, ccg_region)
 
-ggplot(abs_hyper_region, aes(x = NHSER21NM, y = undiagnosed_totals, fill = year)) + 
+ggplot(abs_hyper_region, aes(x = NHSER21NM, y = undiagnosed_22)) + 
   geom_col() +
   labs(x = "Region", y = "Missed Diagnoses", title = "Missed Diagnoses by Region") +
   scale_fill_manual(values = c("#00a3c7", "#d8b2b4")) + 
@@ -2617,8 +2676,58 @@ ggplot(abs_hyper_region, aes(x = NHSER21NM, y = undiagnosed_totals, fill = year)
 
 # Find Regional values 
 regional_totals <- abs_hyper_region %>%
-  group_by(NHSER21NM, year) %>%
-  summarise(undiagnosed_total = round(sum(undiagnosed_totals), 0))
+  group_by(NHSER21NM) %>%
+  summarise(missed_diagnoses_total = round(sum(undiagnosed_22), 0), 
+            region_pop = sum(sub_icb_pop))
 
 
+#### Objective 4 ####
+# Looking into Number of Uncontrolled cases of Hypertension 
+# Start by Calculating the weighted achievement and intervention rates at GP level 
+gp_uncontrolled_prev <- lsoa_hyper_prev %>%
+  mutate(gp_hypertension_cases = under79_denominator_21_22 + over80_denominator_21_22, 
+         weighted_achievement_rate = (under79_denominator_21_22/gp_hypertension_cases)*under79_achievement_net_exceptions_21_22 + 
+           (over80_denominator_21_22/gp_hypertension_cases)*over80_achievement_net_exceptions_21_22, 
+         weighted_intervention_rate = (under79_denominator_21_22/gp_hypertension_cases)*under79_percent_receiving_intervention_21_22 +
+           (over80_denominator_21_22/gp_hypertension_cases)*over80_percent_receiving_intervention_21_22)
 
+# Extrapolating these to LSOA level using the same methods as before 
+lsoa_uncontrolled_prev <- gp_uncontrolled_prev %>%
+  group_by(lsoa_code) %>%
+  summarise(u79_achievement = under79_achievement_net_exceptions_21_22*gp_coverage, 
+            o80_achievement = over80_achievement_net_exceptions_21_22*gp_coverage, 
+            u79_intervention = under79_percent_receiving_intervention_21_22*gp_coverage, 
+            o80_intervention = over80_percent_receiving_intervention_21_22*gp_coverage,
+            weighted_achievement_rate = weighted_achievement_rate*gp_coverage, 
+            weighted_intervention_rate = weighted_intervention_rate*gp_coverage, 
+            lsoa_pop = mean(lsoa_pop))
+
+# Finding the Impact on Undiagnosed Hypertension 
+undiagnosed_excess <- sub_icb_abs %>%
+  mutate(excess_stroke = round(undiagnosed_hypertension/67),
+         excess_stroke_LB = round(undiagnosed_hypertension/84),
+         excess_stroke_UB = round(undiagnosed_hypertension/57), 
+         excess_mi = round(undiagnosed_hypertension/118),
+         excess_mi_LB = round(undiagnosed_hypertension/171), 
+         excses_mi_UB = round(undiagnosed_hypertension/94), 
+         undiagnosed_per_100000 = round(undiagnosed_hypertension/(sub_icb_pop/100000), digits = 2))
+
+regional_undiagnosed_excess <- regional_abs_undiagnosed %>%
+  mutate(excess_stroke = round(tot_undiagnosed/67), 
+         excess_stroke_LB = round(tot_undiagnosed/84), 
+         excess_stroke_UB = round(tot_undiagnosed/57), 
+         excess_mi = round(tot_undiagnosed/118), 
+         excess_mi_LB = round(tot_undiagnosed/171), 
+         excess_mi_UB = round(tot_undiagnosed/94))
+
+# Finding the impact of missed diagnosis due to COVID
+missed_excess
+
+regional_missed_excess <- regional_totals %>%
+  mutate(excess_stroke = round(missed_diagnoses_total/67),
+         excess_stroke_LB = round(missed_diagnoses_total/84),
+         excess_stroke_UB = round(missed_diagnoses_total/57), 
+         excess_mi = round(missed_diagnoses_total/118),
+         excess_mi_LB = round(missed_diagnoses_total/171), 
+         excess_mi_UB = round(missed_diagnoses_total/94), 
+         missed_diagnoses_per_100000 = round(missed_diagnoses_total/(region_pop/100000), digits = 2)) 
