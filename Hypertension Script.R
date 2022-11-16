@@ -9,6 +9,10 @@ library(sf)
 library(stringr)
 library(ggplot2)
 library(RColorBrewer)
+library(plotly)
+library(ggQC)
+library(scales)
+library(waterfalls)
 
 #### Loading Data #####
 # Loading in Shapefile
@@ -305,6 +309,7 @@ lsoa_age_adj <- lsoa_grouped %>%
 
 # Finding the Top Decile of LSOAs by Prevalence
 lsoa_age_adj$percentile <- ntile(lsoa_age_adj$age_std_prev, 100)
+lsoa_age_adj$obs_decile <- ntile(lsoa_age_adj$obs_hyper_prev, 10)
 
 
 # Merging at CCG 
@@ -1370,6 +1375,13 @@ abs_gp_hyper <- merge(undiagnosed_hyp_prev, GP_lsoa_data, by = 'practice_code', 
   # Calculating total undiagnosed by GP 
   mutate(undiagnosed_totals = (undiagnosed_hyp/100)*number_of_patients, 
          gp_coverage = number_of_patients/lsoa_pop)
+
+# Aggregating at LSOA level 
+abs_undiagnosed_lsoa <- abs_gp_hyper %>%
+  group_by(lsoa_code) %>%
+  summarise(undiagnosed_prev = sum(gp_coverage*undiagnosed_hyp, na.rm = TRUE), 
+            lsoa_pop = mean(lsoa_pop)) %>%
+  mutate(undiagnosed = round(undiagnosed_prev*lsoa_pop/100))
 
 # Aggregating at ICS level
 sub_icb_abs <- abs_gp_hyper %>%
@@ -2584,7 +2596,7 @@ QOF_prev_21_22 <- QOF_prev_cl %>%
   filter(., year >= 6)
 
 # performing ITS 
-itsa <- lm(age_std_prevalence ~ year + covid + year*covid, data = QOF_prev_cl)
+itsa <- lm(obs_prevalence ~ year + covid + year*covid, data = QOF_prev_cl)
 summary(itsa)
 
 # Just Year 
@@ -2596,19 +2608,11 @@ covid_yr_regression <- lm(age_std_prevalence ~ year + covid, dat = QOF_prev_cl)
 summary(covid_yr_regression)
 
 ## Using Predict
-model <- lm(age_std_prevalence ~ year + as.factor(ccg_code), data = subset(QOF_prev_cl, year < 6))
-predicted_output <- predict(model, subset(QOF_prev_cl, year >=6))
-
-# Converting to dataframe
-predicted_output <- as.data.frame(predicted_output)
-year_20_21 <- predicted_output[seq(from = 1, to = 106, by = 1), 1]
-year_21_22 <- predicted_output[seq(from = 107, to = 212, by= 1), 1]
-
-pred_output_two_yr <- data.frame(year_20_21, year_21_22)
-QOF_prev_21_22$predicted_age_std_prev <- predict(model, subset(QOF_prev_cl, year >=6))
+model <- lm(obs_prevalence ~ year + as.factor(ccg_code), data = subset(QOF_prev_cl, year < 6))
+QOF_prev_21_22$predicted_prev <- predict(model, subset(QOF_prev_cl, year >=6))
 
 QOF_prev_21_22 <- QOF_prev_21_22 %>%
-  mutate(age_std_prev_diff = age_std_prevalence-predicted_age_std_prev)
+  mutate(prev_diff = obs_prevalence-predicted_prev)
 
 
 ### Coding CCG population ###
@@ -2624,7 +2628,7 @@ ccg_pop <- lsoa_ccg_pop_merge %>%
 
 QOF_prev_pop <- merge(QOF_prev_21_22, ccg_pop, by.x = 'ccg_code', by.y = 'CCG21CDH') %>%
   # Calculating undiagnosed absolute totals from extrapolated population
-  mutate(undiagnosed = round(age_std_prev_diff*sub_icb_pop/100, digits = 0)) 
+  mutate(undiagnosed = round(prev_diff*sub_icb_pop/100, digits = 0)) 
 
 
 # Finding Absolute Values in Differences
@@ -2633,8 +2637,8 @@ missed_21 <- QOF_prev_pop %>%
   select(., -c(exp_prevalence, ratio, year, covid)) %>%
   rename(obs_prev_21 = obs_prevalence, 
          age_std_prev_21 = age_std_prevalence, 
-         pred_age_std_prev_21 = predicted_age_std_prev, 
-         age_std_prev_diff_21 = age_std_prev_diff,
+         pred_prev_21 = predicted_prev, 
+         prev_diff_21 = prev_diff,
          undiagnosed_21 = undiagnosed)
 
 missed_22 <- QOF_prev_pop %>%
@@ -2642,8 +2646,8 @@ missed_22 <- QOF_prev_pop %>%
   select(., -c(exp_prevalence, ratio, year, covid)) %>%
   rename(obs_prev_22 = obs_prevalence, 
          age_std_prev_22 = age_std_prevalence, 
-         pred_age_std_prev_22 = predicted_age_std_prev, 
-         age_std_prev_diff_22 = age_std_prev_diff,
+         pred_prev_22 = predicted_prev, 
+         prev_diff_22 = prev_diff,
          undiagnosed_22 = undiagnosed)
 
 missed_all <- merge(missed_21, missed_22, by = c("ccg_code", "CCG21CD", "CCG21NM", "sub_icb_pop"))
@@ -2668,11 +2672,12 @@ tm_shape(prev_diff_shp) +
 # merge to regional data 
 abs_hyper_region <- full_join(missed_all, ccg_region)
 
-ggplot(abs_hyper_region, aes(x = NHSER21NM, y = undiagnosed_22)) + 
+ggplot(abs_hyper_region, aes(x = NHSER21NM, y = undiagnosed_22, fill = CCG21NM)) + 
   geom_col() +
   labs(x = "Region", y = "Missed Diagnoses", title = "Missed Diagnoses by Region") +
-  scale_fill_manual(values = c("#00a3c7", "#d8b2b4")) + 
-  stat_summary(fun = sum, aes(label = format(..y.., digits = 5), group = NHSER21NM), geom = "text")
+#  scale_fill_brewer() + 
+  stat_summary(fun = sum, aes(label = format(..y.., digits = 5), group = NHSER21NM), geom = "text") +
+  theme(legend.position = "none")
 
 # Find Regional values 
 regional_totals <- abs_hyper_region %>%
@@ -2721,13 +2726,107 @@ regional_undiagnosed_excess <- regional_abs_undiagnosed %>%
          excess_mi_UB = round(tot_undiagnosed/94))
 
 # Finding the impact of missed diagnosis due to COVID
-missed_excess
+sub_icb_missed_excess <- missed_all %>%
+  mutate(excess_stroke = round(undiagnosed_22/67),
+         excess_stroke_LB = round(undiagnosed_22/84),
+         excess_stroke_UB = round(undiagnosed_22/57), 
+         excess_mi = round(undiagnosed_22/118),
+         excess_mi_LB = round(undiagnosed_22/171), 
+         excess_mi_UB = round(undiagnosed_22/94), 
+         missed_diagnoses_per_100000 = round(undiagnosed_22/(sub_icb_pop/100000), digits = 2)) %>%
+#  select(-c(obs_prev_21:age_std_prev_22)) %>%
+  rename(missed_diagnoses = undiagnosed_22, 
+         missed_diagnoses_prev = prev_diff_22)
 
 regional_missed_excess <- regional_totals %>%
-  mutate(excess_stroke = round(missed_diagnoses_total/67),
+  mutate(missed_diagnoses_total = missed_diagnoses_total*-1, 
+         excess_stroke = round(missed_diagnoses_total/67),
          excess_stroke_LB = round(missed_diagnoses_total/84),
          excess_stroke_UB = round(missed_diagnoses_total/57), 
          excess_mi = round(missed_diagnoses_total/118),
          excess_mi_LB = round(missed_diagnoses_total/171), 
          excess_mi_UB = round(missed_diagnoses_total/94), 
          missed_diagnoses_per_100000 = round(missed_diagnoses_total/(region_pop/100000), digits = 2)) 
+
+regional_missed_excess_long <- regional_missed_excess %>%
+  pivot_longer(cols = c("excess_stroke", "excess_mi"), 
+               names_to = "CVD", 
+               values_to = "excess")
+  pivot_longer(cols = c("excess_stroke", "excess_mi"), 
+               names_to = "CVD", 
+               values_to = "excess") %>%
+  pivot_longer(cols = c("excess_stroke_LB", "excess_mi_LB"), 
+               names_to = "CVD",
+               names_prefix = "excess",
+               values_to = "excess")
+
+ggplot(regional_missed_excess_long, aes(x = reorder(NHSER21NM, -excess), y = excess, 
+                              fill = CVD)) +
+  scale_fill_manual('CVD Type', values = c("#00a3c7", "#e93f6f"), 
+                    labels = c("MI", "Stroke")) + 
+  geom_bar(stat = "identity", position = "dodge") +
+ # geom_errorbar(aes(ymin = c(excess_mi_LB, excess_stroke_LB), ymax = c(excess_mi_UB, excess_stroke_UB))) +
+  coord_flip() + 
+  labs(title = "CVD Events by Region", x = "Region", 
+       y = "Number of Events") 
+
+
+# Then plot pareto and waterfall charts for Number of Cases of MI, Stroke and Hypertension
+lsoa_undiagnosed <- merge(lsoa_age_adj, abs_undiagnosed_lsoa, by = c('lsoa_code', 'lsoa_pop')) %>%
+  mutate(across(hypertension_classification, as_factor)) %>%
+  mutate(across(obs_decile, as_factor)) %>%
+  mutate(hypertension_cases = round(obs_hyper_prev*lsoa_pop/100))
+
+decile_cumulative <- lsoa_undiagnosed %>%
+  group_by(obs_decile) %>%
+  summarise(undiagnosed = sum(undiagnosed), 
+            population = sum(lsoa_pop),
+            hypertension_pop = sum(hypertension_cases)) %>%
+  mutate(excess_stroke = round(undiagnosed/67),
+         excess_mi = round(undiagnosed/118), 
+         undiagnosed_per_100000 = round(undiagnosed/(population/100000), digits = 2))
+
+decile_cumulative_long <- decile_cumulative%>%
+  pivot_longer(cols = c('undiagnosed', 'hypertension_pop'), 
+               names_to = 'population_type', 
+               values_to = 'occurances')
+
+ggplot(decile_cumulative, aes(x = obs_decile, y = excess_stroke)) +
+  stat_pareto(point.color = "red", 
+              point.size = 1, 
+              line.color = "black") + 
+  labs(title = "Preventable Strokes by Hypertension Decile", 
+       x = "Hypertension Prevalence Decile", 
+       y = "Prevented Strokes")
+
+ggplot(decile_cumulative, aes(x = obs_decile, y = excess_mi)) +
+  stat_pareto(point.color = "red", 
+              point.size = 1, 
+              line.color = "black") +
+  labs(title = "Preventable MI by Hypertension Decile", 
+       x = "Hypertension Prevalence Decile", 
+       y = "Prevented Cases of MI")
+
+ggplot(decile_cumulative, aes(x = obs_decile, fill = obs_decile)) +
+  scale_fill_brewer(palette = "RdBu", direction = -1) + 
+  geom_col(aes(y = hypertension_pop/1000)) +
+  geom_point(aes(y = undiagnosed/1000), size = 3) +
+  #geom_path(aes(y = undiagnosed/1000, group = 1)) +
+  labs(title = "Hypertension Population Distribution", x = "Hypertension Prevalence Decile", 
+       y = "Hypertension Population (in 1000s)") +
+  scale_y_continuous(sec.axis = sec_axis(~., name = "Undiagnosed Population (in 1000s)")) +
+  theme(legend.position = "none")
+
+ggplot(decile_cumulative_long, aes(x = obs_decile, y = occurances/1000,
+                              fill = factor(population_type, levels = c("undiagnosed", "hypertension_pop")))) +
+  scale_fill_manual('Population Type', values = c("#00a3c7", "#e93f6f"), 
+                    labels = c("Undiagnosed Hypertension", "Diagnosed Hypertension")) + 
+  geom_col() +
+  labs(title = "Hypertension Distribution by Decile", x = "Hypertension Prevalence Decile", 
+       y = "Hypertension Population (in 1000s)") 
+
+densit <- density(lsoa_age_adj$obs_hyper_prev)
+plot(densit)
+
+waterfall(values = regional_undiagnosed_excess$excess_stroke, 
+          labels = regional_undiagnosed_excess$NHSER21NM, calc_total = T)
