@@ -4,6 +4,9 @@ setwd("~/Hypertension")
 #### Installing Packages ####
 library(tidyverse)
 library(tmap)
+library(sf)
+library(sp)
+library(spdep)
 library(janitor)
 library(sf)
 library(stringr)
@@ -441,7 +444,12 @@ north_east_ccg_hyper <- subset(shp_df, NHSER21NM == 'North East and Yorkshire')%
 north_west_ccg_hyper <- subset(shp_df, NHSER21NM == 'North West')%>%
   subset(., select = -c(geo_labelw, label, name, LAD21CD, LAD21NM)) %>%
   rename(lsoa_code = geo_code)
-london_ccg_hyper <- merge(London_2011, ccg_grouped, by.x = 'LSOA11CD', by.y = 'lsoa_code') %>%
+
+london_subset <- subset(shp_df, NHSER21NM == 'London')%>%
+  subset(., select = -c(geo_labelw, label, name, LAD21CD, LAD21NM)) %>%
+  rename(lsoa_code = geo_code)
+
+london_ccg_hyper <- merge(shp, ccg_grouped, by.x = 'LSOA11CD', by.y = 'lsoa_code') %>%
   subset(., select = -c(LAD11CD, LAD11NM, FID, LSOA11NM.y, LAD21CD, LAD21NM)) 
 south_east_ccg_hyper <- subset(shp_df, NHSER21NM == 'South East') %>%
   subset(., select = -c(geo_labelw, label, name, LAD21CD, LAD21NM)) %>%
@@ -1234,7 +1242,7 @@ ggplot(south_east_imd, aes(x = imd_score, y = obs_over_exp)) +
   stat_smooth(method = 'lm', col = 'red', size = 1) + 
   labs(x = "IMD Score", y = "Reported Prevalence to Expected")
 
-## South-West England0 ## 
+## South-West England ## 
 south_west_imd <- merge(south_west_ccg_hyper, LSOA_imd_cl, by.x = "lsoa_code", by.y = "lsoa_code_2011")
 ggplot(south_west_imd, aes(x = imd_score, y = age_std_prev)) + 
   geom_point(aes(color = imd_decile)) +
@@ -1259,7 +1267,7 @@ ggplot(east_imd, aes(x = imd_score, y = obs_over_exp)) +
   labs(x = "IMD Score", y = "Reported Prevalence to Expected")
 
 ## London ## 
-london_imd <- merge(london_ccg_hyper, LSOA_imd_cl, by.x = "LSOA11CD", by.y = "lsoa_code_2011")
+london_imd <- merge(london_subset, LSOA_imd_cl, by.x = "lsoa_code", by.y = "lsoa_code_2011")
 ggplot(london_imd, aes(x = imd_score, y = age_std_prev)) + 
   geom_point(aes(color = imd_decile)) +
   stat_smooth(method = 'lm', col = 'red', size = 1) + 
@@ -1269,6 +1277,34 @@ ggplot(london_imd, aes(x = imd_score, y = obs_over_exp)) +
   geom_point(aes(color = imd_decile)) + 
   stat_smooth(method = 'lm', col = 'red', size = 1) + 
   labs(x = "IMD Score", y = "Reported Prevalence to Expected")
+
+#### For Methods Club Presentaiton ####
+imd_reg <- lm(age_std_prev ~ imd_score, data = london_imd)
+summary(imd_reg)
+
+london_subset$RESIDUALS <- imd_reg$residuals
+summary(london_subset$RESIDUALS)
+
+tm_shape(london_subset) + 
+  tm_fill("RESIDUALS", style = "cont", midpoint = 0, palette = "-RdBu") + 
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar(position = c("left", "bottom")) +
+  tm_layout(frame = FALSE) +
+tm_shape(london_ccg) + 
+  tm_borders()
+
+#generate unique number for each row
+london_subset$ROWNUM <- 1:nrow(london_subset)
+# We need to coerce the sf spatialdatafile object into a new sp object
+london_hyper_sp <- as(london_subset, "Spatial")
+# Create spatial weights matrix for areas
+Weights <- poly2nb(london_hyper_sp, row.names = london_hyper_sp$ROWNUM)
+WeightsMatrix <- nb2mat(Weights, style='B')
+Residual_WeightMatrix <- mat2listw(WeightsMatrix , style='W')
+# Run the test on the regression model output object "modelMLR" using lm.morantest()
+lm.morantest(imd_reg, Residual_WeightMatrix, alternative="two.sided")
+
+###########
 
 # Create a second set Shapefile for Deprivation Prevalence 
 lsoa_ccg_region <- merge(lsoa_ccg_shp, ccg_region, by = c('CCG21CD', 'CCG21NM', 'CCG21CDH'))
@@ -1382,6 +1418,11 @@ abs_undiagnosed_lsoa <- abs_gp_hyper %>%
   summarise(undiagnosed_prev = sum(gp_coverage*undiagnosed_hyp, na.rm = TRUE), 
             lsoa_pop = mean(lsoa_pop)) %>%
   mutate(undiagnosed = round(undiagnosed_prev*lsoa_pop/100))
+
+abs_undiagnosed_lsoa_ccg <- merge(abs_undiagnosed_lsoa, lsoa_ccg_pop_merge, by = c('lsoa_code', 'lsoa_pop')) %>%
+  select(-c(FID, LAD21CD, LAD21NM))
+
+abs_undiagnosed_lsoa_region <- merge(abs_undiagnosed_lsoa_ccg, ccg_region, by = c('CCG21NM', 'CCG21CD', 'CCG21CDH'))
 
 # Aggregating at ICS level
 sub_icb_abs <- abs_gp_hyper %>%
@@ -2604,15 +2645,15 @@ year_reg <- lm(age_std_prevalence ~ year, data = QOF_prev_cl)
 summary(year_reg)
 
 # Year and Covid without Interaction 
-covid_yr_regression <- lm(age_std_prevalence ~ year + covid, dat = QOF_prev_cl)
+covid_yr_regression <- lm(age_std_prevalence ~ year + covid, data = QOF_prev_cl)
 summary(covid_yr_regression)
 
 ## Using Predict
-model <- lm(obs_prevalence ~ year + as.factor(ccg_code), data = subset(QOF_prev_cl, year < 6))
+model <- lm(age_std_prevalence ~ year + as.factor(ccg_code), data = subset(QOF_prev_cl, year < 6))
 QOF_prev_21_22$predicted_prev <- predict(model, subset(QOF_prev_cl, year >=6))
 
 QOF_prev_21_22 <- QOF_prev_21_22 %>%
-  mutate(prev_diff = obs_prevalence-predicted_prev)
+  mutate(prev_diff = age_std_prevalence-predicted_prev)
 
 
 ### Coding CCG population ###
@@ -2777,6 +2818,7 @@ lsoa_undiagnosed <- merge(lsoa_age_adj, abs_undiagnosed_lsoa, by = c('lsoa_code'
   mutate(across(obs_decile, as_factor)) %>%
   mutate(hypertension_cases = round(obs_hyper_prev*lsoa_pop/100))
 
+# Done by Prevalence Decile
 decile_cumulative <- lsoa_undiagnosed %>%
   group_by(obs_decile) %>%
   summarise(undiagnosed = sum(undiagnosed), 
@@ -2785,6 +2827,19 @@ decile_cumulative <- lsoa_undiagnosed %>%
   mutate(excess_stroke = round(undiagnosed/67),
          excess_mi = round(undiagnosed/118), 
          undiagnosed_per_100000 = round(undiagnosed/(population/100000), digits = 2))
+
+undiagnosed_decile <- lsoa_undiagnosed %>%
+  dplyr::mutate(ntile = ntile(undiagnosed, 5), 
+                excess_stroke = round(undiagnosed/67), 
+                excess_mi = round(undiagnosed/118)) %>%
+  mutate(across(ntile, as_factor))
+
+undiagnosed_decile_grouped <- undiagnosed_decile %>%
+  dplyr::group_by(ntile) %>%
+  summarise(undiagnosed = sum(undiagnosed), 
+            population = sum(lsoa_pop), 
+            excess_stroke = sum(excess_stroke), 
+            excess_mi = sum(excess_mi)) 
 
 decile_cumulative_long <- decile_cumulative%>%
   pivot_longer(cols = c('undiagnosed', 'hypertension_pop'), 
@@ -2807,26 +2862,385 @@ ggplot(decile_cumulative, aes(x = obs_decile, y = excess_mi)) +
        x = "Hypertension Prevalence Decile", 
        y = "Prevented Cases of MI")
 
+ggplot(undiagnosed_decile, aes(x = ntile, y = excess_stroke)) +
+  stat_pareto(point.color = "red", 
+              point.size = 1, 
+              line.color = "black") + 
+  labs(title = "Preventable Strokes by Undiagnosed Hypertension Decile", 
+       x = "Undiagnosed Hypertension Decile", 
+       y = "Prevented Strokes")
+
 ggplot(decile_cumulative, aes(x = obs_decile, fill = obs_decile)) +
   scale_fill_brewer(palette = "RdBu", direction = -1) + 
   geom_col(aes(y = hypertension_pop/1000)) +
   geom_point(aes(y = undiagnosed/1000), size = 3) +
-  #geom_path(aes(y = undiagnosed/1000, group = 1)) +
+  geom_path(aes(y = undiagnosed/1000, group = 1)) +
   labs(title = "Hypertension Population Distribution", x = "Hypertension Prevalence Decile", 
        y = "Hypertension Population (in 1000s)") +
+  geom_text(aes(1, 750, label = 'Undiagnosed Population', vjust = -1.5, hjust = 0.25)) +
   scale_y_continuous(sec.axis = sec_axis(~., name = "Undiagnosed Population (in 1000s)")) +
-  theme(legend.position = "none")
+  theme(legend.position =  "none")
 
 ggplot(decile_cumulative_long, aes(x = obs_decile, y = occurances/1000,
-                              fill = factor(population_type, levels = c("undiagnosed", "hypertension_pop")))) +
+                                   fill = factor(population_type, levels = c("undiagnosed", "hypertension_pop")))) +
   scale_fill_manual('Population Type', values = c("#00a3c7", "#e93f6f"), 
                     labels = c("Undiagnosed Hypertension", "Diagnosed Hypertension")) + 
   geom_col() +
   labs(title = "Hypertension Distribution by Decile", x = "Hypertension Prevalence Decile", 
        y = "Hypertension Population (in 1000s)") 
 
-densit <- density(lsoa_age_adj$obs_hyper_prev)
-plot(densit)
 
-waterfall(values = regional_undiagnosed_excess$excess_stroke, 
-          labels = regional_undiagnosed_excess$NHSER21NM, calc_total = T)
+# Done by Region
+ggplot(regional_missed_excess, aes(x = NHSER21NM, y = excess_stroke)) +
+  stat_pareto(point.color = "red", 
+              point.size = 2, 
+              line.color = "black") + 
+  labs(title = "Preventable Stroke by Region", 
+       x = "NHS England Region", 
+       y = "Prevented Cases of Stroke")
+
+
+# Midlands Specific 
+midlands_undiagnosed <- abs_undiagnosed_lsoa_region %>%
+  dplyr::filter(NHSER21NM == "Midlands") %>%
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
+
+midlands_undiagnosed_grouped <- midlands_undiagnosed %>%
+  group_by(undiagnosed_quintile) %>%
+  summarise(pop = sum(lsoa_pop),
+            undiagnosed = sum(undiagnosed)) %>%
+  dplyr::mutate(excess_stroke = round(undiagnosed/67), 
+         excess_mi = round(undiagnosed/118)) %>%
+  dplyr::mutate(across(undiagnosed_quintile, as_factor))
+
+ggplot(midlands_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
+  stat_pareto(point.color = "red", 
+              point.size = 2, 
+              line.color = "black") +
+  labs(title = "Preventable Strokes in the Midlands", 
+       x = "Undiagnosed Quintile", 
+       y = "Preventable Cases of Stroke")
+
+# East of England 
+east_england_undiagnosed <- abs_undiagnosed_lsoa_region %>%
+  dplyr::filter(NHSER21NM == "East of England") %>%
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
+
+east_england_undiagnosed_grouped <- east_england_undiagnosed %>%
+  group_by(undiagnosed_quintile) %>%
+  summarise(pop = sum(lsoa_pop),
+            undiagnosed = sum(undiagnosed)) %>%
+  dplyr::mutate(excess_stroke = round(undiagnosed/67), 
+                excess_mi = round(undiagnosed/118)) %>%
+  dplyr::mutate(across(undiagnosed_quintile, as_factor))
+
+ggplot(east_england_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
+  stat_pareto(point.color = "red", 
+              point.size = 2, 
+              line.color = "black") +
+  labs(title = "Preventable Strokes in the East of England", 
+       x = "Undiagnosed Quintile", 
+       y = "Preventable Cases of Stroke")
+
+# London 
+london_undiagnosed <- abs_undiagnosed_lsoa_region %>%
+  dplyr::filter(NHSER21NM == "London") %>%
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
+
+london_undiagnosed_grouped <- london_undiagnosed %>%
+  group_by(undiagnosed_quintile) %>%
+  summarise(pop = sum(lsoa_pop),
+            undiagnosed = sum(undiagnosed)) %>%
+  dplyr::mutate(excess_stroke = round(undiagnosed/67), 
+                excess_mi = round(undiagnosed/118)) %>%
+  dplyr::mutate(across(undiagnosed_quintile, as_factor))
+
+ggplot(london_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
+  stat_pareto(point.color = "red", 
+              point.size = 2, 
+              line.color = "black") +
+  labs(title = "Preventable Strokes in London", 
+       x = "Undiagnosed Quintile", 
+       y = "Preventable Cases of Stroke")
+
+
+# North-East and Yorkshire 
+north_east_undiagnosed <- abs_undiagnosed_lsoa_region %>%
+  dplyr::filter(NHSER21NM == "North East and Yorkshire") %>%
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
+
+north_east_undiagnosed_grouped <- north_east_undiagnosed %>%
+  group_by(undiagnosed_quintile) %>%
+  summarise(pop = sum(lsoa_pop),
+            undiagnosed = sum(undiagnosed)) %>%
+  dplyr::mutate(excess_stroke = round(undiagnosed/67), 
+                excess_mi = round(undiagnosed/118)) %>%
+  dplyr::mutate(across(undiagnosed_quintile, as_factor))
+
+ggplot(north_east_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
+  stat_pareto(point.color = "red", 
+              point.size = 2, 
+              line.color = "black") +
+  labs(title = "Preventable Strokes in the North East and Yorkshire", 
+       x = "Undiagnosed Quintile", 
+       y = "Preventable Cases of Stroke")
+
+# North-West
+north_west_undiagnosed <- abs_undiagnosed_lsoa_region %>%
+  dplyr::filter(NHSER21NM == "North West") %>%
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
+
+north_west_undiagnosed_grouped <- north_west_undiagnosed %>%
+  group_by(undiagnosed_quintile) %>%
+  summarise(pop = sum(lsoa_pop),
+            undiagnosed = sum(undiagnosed)) %>%
+  dplyr::mutate(excess_stroke = round(undiagnosed/67), 
+                excess_mi = round(undiagnosed/118)) %>%
+  dplyr::mutate(across(undiagnosed_quintile, as_factor))
+
+ggplot(north_west_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
+  stat_pareto(point.color = "red", 
+              point.size = 2, 
+              line.color = "black") +
+  labs(title = "Preventable Strokes in the North West", 
+       x = "Undiagnosed Quintile", 
+       y = "Preventable Cases of Stroke")
+
+# South-East
+south_east_undiagnosed <- abs_undiagnosed_lsoa_region %>%
+  dplyr::filter(NHSER21NM == "South East") %>%
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
+
+south_east_undiagnosed_grouped <- south_east_undiagnosed %>%
+  group_by(undiagnosed_quintile) %>%
+  summarise(pop = sum(lsoa_pop),
+            undiagnosed = sum(undiagnosed)) %>%
+  dplyr::mutate(excess_stroke = round(undiagnosed/67), 
+                excess_mi = round(undiagnosed/118)) %>%
+  dplyr::mutate(across(undiagnosed_quintile, as_factor))
+
+ggplot(south_east_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
+  stat_pareto(point.color = "red", 
+              point.size = 2, 
+              line.color = "black") +
+  labs(title = "Preventable Strokes in the South East", 
+       x = "Undiagnosed Quintile", 
+       y = "Preventable Cases of Stroke")
+
+# South-West
+south_west_undiagnosed <- abs_undiagnosed_lsoa_region %>%
+  dplyr::filter(NHSER21NM == "South West") %>%
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
+
+south_west_undiagnosed_grouped <- south_west_undiagnosed %>%
+  group_by(undiagnosed_quintile) %>%
+  summarise(pop = sum(lsoa_pop),
+            undiagnosed = sum(undiagnosed)) %>%
+  dplyr::mutate(excess_stroke = round(undiagnosed/67), 
+                excess_mi = round(undiagnosed/118)) %>%
+  dplyr::mutate(across(undiagnosed_quintile, as_factor))
+
+ggplot(south_west_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
+  stat_pareto(point.color = "red", 
+              point.size = 2, 
+              line.color = "black") +
+  labs(title = "Preventable Strokes in the South West", 
+       x = "Undiagnosed Quintile", 
+       y = "Preventable Cases of Stroke")
+
+
+#### Waterfall Plots - Excess Strokes ####
+waterfall(values = undiagnosed_decile_grouped$excess_stroke, 
+          labels = undiagnosed_decile_grouped$ntile, calc_total = T,
+          total_rect_color = "#002f5f",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#dcfffd", "#c3f0fa", "#ade1f6", "#95d1f2", "#8bbee0")) +
+  theme_minimal() +
+  labs(title = "Excess Stroke in the England", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Excess Strokes") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+
+waterfall(values = midlands_undiagnosed_grouped$excess_stroke, 
+          labels = midlands_undiagnosed_grouped$undiagnosed_quintile, calc_total = T,
+          total_rect_color = "#002f5f",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#dcfffd", "#c3f0fa", "#ade1f6", "#95d1f2", "#8bbee0")) +
+  theme_minimal() +
+  labs(title = "Excess Stroke in the Midlands", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Excess Strokes") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+waterfall(values = east_england_undiagnosed_grouped$excess_stroke, 
+          labels = east_england_undiagnosed_grouped$undiagnosed_quintile, calc_total = T,
+          total_rect_color = "#002f5f",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#dcfffd", "#c3f0fa", "#ade1f6", "#95d1f2", "#8bbee0")) +
+  theme_minimal() +
+  labs(title = "Excess Stroke in the East of England", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Excess Strokes") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+waterfall(values = london_undiagnosed_grouped$excess_stroke, 
+          labels = london_undiagnosed_grouped$undiagnosed_quintile, calc_total = T,
+          total_rect_color = "#002f5f",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#dcfffd", "#c3f0fa", "#ade1f6", "#95d1f2", "#8bbee0")) +
+  theme_minimal() +
+  labs(title = "Excess Stroke in London", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Excess Strokes") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+waterfall(values = north_east_undiagnosed_grouped$excess_stroke, 
+          labels = north_east_undiagnosed_grouped$undiagnosed_quintile, calc_total = T,
+          total_rect_color = "#002f5f",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#dcfffd", "#c3f0fa", "#ade1f6", "#95d1f2", "#8bbee0")) +
+  theme_minimal() +
+  labs(title = "Excess Stroke in the North East and Yorkshire", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Excess Strokes") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+waterfall(values = north_west_undiagnosed_grouped$excess_stroke, 
+          labels = north_west_undiagnosed_grouped$undiagnosed_quintile, calc_total = T,
+          total_rect_color = "#002f5f",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#dcfffd", "#c3f0fa", "#ade1f6", "#95d1f2", "#8bbee0")) +
+  theme_minimal() +
+  labs(title = "Excess Stroke in the North West", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Excess Strokes") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+waterfall(values = south_east_undiagnosed_grouped$excess_stroke, 
+          labels = south_east_undiagnosed_grouped$undiagnosed_quintile, calc_total = T,
+          total_rect_color = "#002f5f",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#dcfffd", "#c3f0fa", "#ade1f6", "#95d1f2", "#8bbee0")) +
+  theme_minimal() +
+  labs(title = "Excess Stroke in the South East", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Excess Strokes") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+waterfall(values = south_west_undiagnosed_grouped$excess_stroke, 
+          labels = south_west_undiagnosed_grouped$undiagnosed_quintile, calc_total = T,
+          total_rect_color = "#002f5f",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#dcfffd", "#c3f0fa", "#ade1f6", "#95d1f2", "#8bbee0")) +
+  theme_minimal() +
+  labs(title = "Excess Stroke in the South West", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Excess Strokes") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+#### Waterfall Plots - Excess MI ####
+waterfall(values = undiagnosed_decile_grouped$excess_mi, 
+          labels = undiagnosed_decile_grouped$ntile, calc_total = T,
+          total_rect_color = "#840034",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#fde5e2", "#fbcdca", "#f9b6b5", "#f6a0a0", "#b9787f")) +
+  theme_minimal() +
+  labs(title = "Excess MI in the England", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Excess MI") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+
+waterfall(values = midlands_undiagnosed_grouped$excess_mi, 
+          labels = midlands_undiagnosed_grouped$undiagnosed_quintile, calc_total = T,
+          total_rect_color = "#840034",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#fde5e2", "#fbcdca", "#f9b6b5", "#f6a0a0", "#b9787f")) +
+  theme_minimal() +
+  labs(title = "Excess MI in the Midlands", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Excess MI") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+waterfall(values = east_england_undiagnosed_grouped$excess_mi, 
+          labels = east_england_undiagnosed_grouped$undiagnosed_quintile, calc_total = T,
+          total_rect_color = "#840034",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#fde5e2", "#fbcdca", "#f9b6b5", "#f6a0a0", "#b9787f")) +
+  theme_minimal() +
+  labs(title = "Excess MI in the East of England", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Excess MIs") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+waterfall(values = london_undiagnosed_grouped$excess_mi, 
+          labels = london_undiagnosed_grouped$undiagnosed_quintile, calc_total = T,
+          total_rect_color = "#840034",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#fde5e2", "#fbcdca", "#f9b6b5", "#f6a0a0", "#b9787f")) +
+  theme_minimal() +
+  labs(title = "Excess MI in London", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Excess MIs") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+waterfall(values = north_east_undiagnosed_grouped$excess_mi, 
+          labels = north_east_undiagnosed_grouped$undiagnosed_quintile, calc_total = T,
+          total_rect_color = "#840034",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#fde5e2", "#fbcdca", "#f9b6b5", "#f6a0a0", "#b9787f")) +
+  theme_minimal() +
+  labs(title = "Excess MI in the North East and Yorkshire", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Excess MIs") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+waterfall(values = north_west_undiagnosed_grouped$excess_mi, 
+          labels = north_west_undiagnosed_grouped$undiagnosed_quintile, calc_total = T,
+          total_rect_color = "#840034",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#fde5e2", "#fbcdca", "#f9b6b5", "#f6a0a0", "#b9787f")) +
+  theme_minimal() +
+  labs(title = "Excess MI in the North West", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Excess MIs") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+waterfall(values = south_east_undiagnosed_grouped$excess_mi, 
+          labels = south_east_undiagnosed_grouped$undiagnosed_quintile, calc_total = T,
+          total_rect_color = "#840034",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#fde5e2", "#fbcdca", "#f9b6b5", "#f6a0a0", "#b9787f")) +
+  theme_minimal() +
+  labs(title = "Excess MI in the South East", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Excess MIs") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+waterfall(values = south_west_undiagnosed_grouped$excess_mi, 
+          labels = south_west_undiagnosed_grouped$undiagnosed_quintile, calc_total = T,
+          total_rect_color = "#840034",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#fde5e2", "#fbcdca", "#f9b6b5", "#f6a0a0", "#b9787f")) +
+  theme_minimal() +
+  labs(title = "Excess MI in the South West", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Excess MIs") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
