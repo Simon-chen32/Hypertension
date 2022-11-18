@@ -2632,9 +2632,11 @@ QOF_prev_cl <- QOF_prev_long %>%
   mutate(covid = case_when(year >= 21 ~ 1, T ~ 0), 
          year = year - 15) # creating dummy variable for the covid years 
 
-# Subsetting for just the COVID years 
 QOF_prev_21_22 <- QOF_prev_cl %>%
-  filter(., year >= 6)
+  filter(year >= 6)
+
+QOF_prev_21_22_std <- QOF_prev_cl %>%
+  filter(year >= 6)
 
 # performing ITS 
 itsa <- lm(obs_prevalence ~ year + covid + year*covid, data = QOF_prev_cl)
@@ -2649,12 +2651,17 @@ covid_yr_regression <- lm(age_std_prevalence ~ year + covid, data = QOF_prev_cl)
 summary(covid_yr_regression)
 
 ## Using Predict
-model <- lm(age_std_prevalence ~ year + as.factor(ccg_code), data = subset(QOF_prev_cl, year < 6))
+model <- lm(obs_prevalence ~ year + as.factor(ccg_code) + year*as.factor(ccg_code), data = subset(QOF_prev_cl, year < 6))
 QOF_prev_21_22$predicted_prev <- predict(model, subset(QOF_prev_cl, year >=6))
 
-QOF_prev_21_22 <- QOF_prev_21_22 %>%
-  mutate(prev_diff = age_std_prevalence-predicted_prev)
+model2 <- lm(age_std_prevalence ~ year + as.factor(ccg_code) + year*as.factor(ccg_code), data = subset(QOF_prev_cl, year < 6))
+QOF_prev_21_22_std$predicted_prev <- predict(model2, subset(QOF_prev_cl, year >=6))
 
+QOF_prev_21_22 <- QOF_prev_21_22 %>%
+  mutate(prev_diff = obs_prevalence-predicted_prev)
+
+QOF_prev_21_22_std <- QOF_prev_21_22_std %>%
+  mutate(prev_diff = age_std_prevalence-predicted_prev)
 
 ### Coding CCG population ###
 lsoa_pop_from_GP <- GP_lsoa_dist %>%
@@ -2671,6 +2678,10 @@ QOF_prev_pop <- merge(QOF_prev_21_22, ccg_pop, by.x = 'ccg_code', by.y = 'CCG21C
   # Calculating undiagnosed absolute totals from extrapolated population
   mutate(undiagnosed = round(prev_diff*sub_icb_pop/100, digits = 0)) 
 
+
+QOF_prev_pop_std <- merge(QOF_prev_21_22_std, ccg_pop, by.x = 'ccg_code', by.y = 'CCG21CDH') %>%
+  # Calculating undiagnosed absolute totals from extrapolated population
+  mutate(undiagnosed = round(prev_diff*sub_icb_pop/100, digits = 0)) 
 
 # Finding Absolute Values in Differences
 missed_21 <- QOF_prev_pop %>%
@@ -2693,6 +2704,26 @@ missed_22 <- QOF_prev_pop %>%
 
 missed_all <- merge(missed_21, missed_22, by = c("ccg_code", "CCG21CD", "CCG21NM", "sub_icb_pop"))
 
+missed_21_std <- QOF_prev_pop_std %>%
+  filter(year == 6) %>%
+  select(., -c(exp_prevalence, ratio, year, covid)) %>%
+  rename(obs_prev_21 = obs_prevalence, 
+         age_std_prev_21 = age_std_prevalence, 
+         pred_prev_21 = predicted_prev, 
+         prev_diff_21 = prev_diff,
+         undiagnosed_21 = undiagnosed)
+
+missed_22_std <- QOF_prev_pop_std %>%
+  filter(year == 7) %>%
+  select(., -c(exp_prevalence, ratio, year, covid)) %>%
+  rename(obs_prev_22 = obs_prevalence, 
+         age_std_prev_22 = age_std_prevalence, 
+         pred_prev_22 = predicted_prev, 
+         prev_diff_22 = prev_diff,
+         undiagnosed_22 = undiagnosed)
+
+missed_all_std <- merge(missed_21_std, missed_22_std, by = c("ccg_code", "CCG21CD", "CCG21NM", "sub_icb_pop"))
+
 # plotting differences
 prev_diff_shp <- merge(Eng_CCG, QOF_prev_pop, by = c('CCG21CD', 'CCG21NM')) 
 
@@ -2713,6 +2744,8 @@ tm_shape(prev_diff_shp) +
 # merge to regional data 
 abs_hyper_region <- full_join(missed_all, ccg_region)
 
+abs_hyper_region_std <- full_join(missed_all_std, ccg_region)
+
 ggplot(abs_hyper_region, aes(x = NHSER21NM, y = undiagnosed_22, fill = CCG21NM)) + 
   geom_col() +
   labs(x = "Region", y = "Missed Diagnoses", title = "Missed Diagnoses by Region") +
@@ -2723,7 +2756,12 @@ ggplot(abs_hyper_region, aes(x = NHSER21NM, y = undiagnosed_22, fill = CCG21NM))
 # Find Regional values 
 regional_totals <- abs_hyper_region %>%
   group_by(NHSER21NM) %>%
-  summarise(missed_diagnoses_total = round(sum(undiagnosed_22), 0), 
+  summarise(missed_diagnoses_total = round(sum(undiagnosed_21), 0), 
+            region_pop = sum(sub_icb_pop))
+
+regional_totals_std <- abs_hyper_region_std %>%
+  group_by(NHSER21NM) %>%
+  summarise(missed_diagnoses_total = round(sum(undiagnosed_21), 0), 
             region_pop = sum(sub_icb_pop))
 
 
@@ -2768,12 +2806,12 @@ regional_undiagnosed_excess <- regional_abs_undiagnosed %>%
 
 # Finding the impact of missed diagnosis due to COVID
 sub_icb_missed_excess <- missed_all %>%
-  mutate(excess_stroke = round(undiagnosed_22/67),
-         excess_stroke_LB = round(undiagnosed_22/84),
-         excess_stroke_UB = round(undiagnosed_22/57), 
-         excess_mi = round(undiagnosed_22/118),
-         excess_mi_LB = round(undiagnosed_22/171), 
-         excess_mi_UB = round(undiagnosed_22/94), 
+  mutate(excess_stroke = floor(undiagnosed_22/67),
+         excess_stroke_LB = floor(undiagnosed_22/84),
+         excess_stroke_UB = floor(undiagnosed_22/57), 
+         excess_mi = floor(undiagnosed_22/118),
+         excess_mi_LB = floor(undiagnosed_22/171), 
+         excess_mi_UB = floor(undiagnosed_22/94), 
          missed_diagnoses_per_100000 = round(undiagnosed_22/(sub_icb_pop/100000), digits = 2)) %>%
 #  select(-c(obs_prev_21:age_std_prev_22)) %>%
   rename(missed_diagnoses = undiagnosed_22, 
@@ -2781,32 +2819,45 @@ sub_icb_missed_excess <- missed_all %>%
 
 regional_missed_excess <- regional_totals %>%
   mutate(missed_diagnoses_total = missed_diagnoses_total*-1, 
-         excess_stroke = round(missed_diagnoses_total/67),
-         excess_stroke_LB = round(missed_diagnoses_total/84),
-         excess_stroke_UB = round(missed_diagnoses_total/57), 
-         excess_mi = round(missed_diagnoses_total/118),
-         excess_mi_LB = round(missed_diagnoses_total/171), 
-         excess_mi_UB = round(missed_diagnoses_total/94), 
+         stroke = floor(missed_diagnoses_total/67),
+         stroke_LB = floor(missed_diagnoses_total/84),
+         stroke_UB = floor(missed_diagnoses_total/57), 
+         mi = floor(missed_diagnoses_total/118),
+         mi_LB = floor(missed_diagnoses_total/171), 
+         mi_UB = floor(missed_diagnoses_total/94), 
          missed_diagnoses_per_100000 = round(missed_diagnoses_total/(region_pop/100000), digits = 2)) 
 
-regional_missed_excess_long <- regional_missed_excess %>%
-  pivot_longer(cols = c("excess_stroke", "excess_mi"), 
-               names_to = "CVD", 
-               values_to = "excess")
-  pivot_longer(cols = c("excess_stroke", "excess_mi"), 
-               names_to = "CVD", 
-               values_to = "excess") %>%
-  pivot_longer(cols = c("excess_stroke_LB", "excess_mi_LB"), 
-               names_to = "CVD",
-               names_prefix = "excess",
-               values_to = "excess")
+regional_missed_excess$NHSER21NM <- factor(regional_missed_excess$NHSER21NM, 
+                                           levels = rev(sort(regional_missed_excess$NHSER21NM)))
 
-ggplot(regional_missed_excess_long, aes(x = reorder(NHSER21NM, -excess), y = excess, 
+regional_missed_excess_long <- regional_missed_excess %>%
+  pivot_longer(cols = c("stroke", "mi"), 
+               names_to = "CVD",
+               values_to = "excess") %>%
+  select(-c(stroke_LB:mi_UB))
+
+LB <- regional_missed_excess %>%
+  pivot_longer(cols = c("stroke_LB", "mi_LB"), 
+               names_to = "CVD_LB",
+               values_to = "LB") %>%
+  select(-c(stroke:mi_UB))
+
+UB <- regional_missed_excess %>%
+  pivot_longer(cols = c("stroke_UB", "mi_UB"), 
+               names_to = "CVD_UB", 
+               values_to = "UB") %>%
+  select(-c(stroke:mi_LB))
+
+region_missed_long <- cbind(regional_missed_excess_long, LB, UB) %>%
+  select(-c(7:10, 13:16))
+
+#### Plotting Missed ####
+ggplot(region_missed_long, aes(x = NHSER21NM, y = excess, 
                               fill = CVD)) +
-  scale_fill_manual('CVD Type', values = c("#00a3c7", "#e93f6f"), 
+  scale_fill_manual('CVD Type', values = c("#e93f6f", "#00a3c7"), 
                     labels = c("MI", "Stroke")) + 
   geom_bar(stat = "identity", position = "dodge") +
- # geom_errorbar(aes(ymin = c(excess_mi_LB, excess_stroke_LB), ymax = c(excess_mi_UB, excess_stroke_UB))) +
+  geom_errorbar(aes(ymin = LB, ymax = UB), width = .2, position = position_dodge(1)) +
   coord_flip() + 
   labs(title = "CVD Events by Region", x = "Region", 
        y = "Number of Events") 
@@ -2824,14 +2875,14 @@ decile_cumulative <- lsoa_undiagnosed %>%
   summarise(undiagnosed = sum(undiagnosed), 
             population = sum(lsoa_pop),
             hypertension_pop = sum(hypertension_cases)) %>%
-  mutate(excess_stroke = round(undiagnosed/67),
-         excess_mi = round(undiagnosed/118), 
+  mutate(excess_stroke = floor(undiagnosed/67),
+         excess_mi = floor(undiagnosed/118), 
          undiagnosed_per_100000 = round(undiagnosed/(population/100000), digits = 2))
 
 undiagnosed_decile <- lsoa_undiagnosed %>%
   dplyr::mutate(ntile = ntile(undiagnosed, 5), 
-                excess_stroke = round(undiagnosed/67), 
-                excess_mi = round(undiagnosed/118)) %>%
+                excess_stroke = floor(undiagnosed/67), 
+                excess_mi = floor(undiagnosed/118)) %>%
   mutate(across(ntile, as_factor))
 
 undiagnosed_decile_grouped <- undiagnosed_decile %>%
@@ -2903,14 +2954,16 @@ ggplot(regional_missed_excess, aes(x = NHSER21NM, y = excess_stroke)) +
 # Midlands Specific 
 midlands_undiagnosed <- abs_undiagnosed_lsoa_region %>%
   dplyr::filter(NHSER21NM == "Midlands") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5),
+                excess_stroke = floor(undiagnosed/67), 
+                excess_mi = floor(undiagnosed/118)) 
 
 midlands_undiagnosed_grouped <- midlands_undiagnosed %>%
   group_by(undiagnosed_quintile) %>%
   summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed)) %>%
-  dplyr::mutate(excess_stroke = round(undiagnosed/67), 
-         excess_mi = round(undiagnosed/118)) %>%
+            undiagnosed = sum(undiagnosed), 
+            excess_stroke = sum(excess_stroke), 
+            excess_mi = sum(excess_mi)) %>%
   dplyr::mutate(across(undiagnosed_quintile, as_factor))
 
 ggplot(midlands_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
@@ -2924,14 +2977,16 @@ ggplot(midlands_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_st
 # East of England 
 east_england_undiagnosed <- abs_undiagnosed_lsoa_region %>%
   dplyr::filter(NHSER21NM == "East of England") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5),
+                excess_stroke = floor(undiagnosed/67), 
+                excess_mi = floor(undiagnosed/118)) 
 
 east_england_undiagnosed_grouped <- east_england_undiagnosed %>%
   group_by(undiagnosed_quintile) %>%
   summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed)) %>%
-  dplyr::mutate(excess_stroke = round(undiagnosed/67), 
-                excess_mi = round(undiagnosed/118)) %>%
+            undiagnosed = sum(undiagnosed), 
+            excess_stroke = sum(excess_stroke), 
+            excess_mi = sum(excess_mi)) %>%
   dplyr::mutate(across(undiagnosed_quintile, as_factor))
 
 ggplot(east_england_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
@@ -2945,14 +3000,16 @@ ggplot(east_england_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = exces
 # London 
 london_undiagnosed <- abs_undiagnosed_lsoa_region %>%
   dplyr::filter(NHSER21NM == "London") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5),
+                excess_stroke = floor(undiagnosed/67), 
+                excess_mi = floor(undiagnosed/118)) 
 
 london_undiagnosed_grouped <- london_undiagnosed %>%
   group_by(undiagnosed_quintile) %>%
   summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed)) %>%
-  dplyr::mutate(excess_stroke = round(undiagnosed/67), 
-                excess_mi = round(undiagnosed/118)) %>%
+            undiagnosed = sum(undiagnosed), 
+            excess_stroke = sum(excess_stroke), 
+            excess_mi = sum(excess_mi)) %>%
   dplyr::mutate(across(undiagnosed_quintile, as_factor))
 
 ggplot(london_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
@@ -2967,14 +3024,16 @@ ggplot(london_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stro
 # North-East and Yorkshire 
 north_east_undiagnosed <- abs_undiagnosed_lsoa_region %>%
   dplyr::filter(NHSER21NM == "North East and Yorkshire") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5),
+                excess_stroke = floor(undiagnosed/67), 
+                excess_mi = floor(undiagnosed/118)) 
 
 north_east_undiagnosed_grouped <- north_east_undiagnosed %>%
   group_by(undiagnosed_quintile) %>%
   summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed)) %>%
-  dplyr::mutate(excess_stroke = round(undiagnosed/67), 
-                excess_mi = round(undiagnosed/118)) %>%
+            undiagnosed = sum(undiagnosed), 
+            excess_stroke = sum(excess_stroke), 
+            excess_mi = sum(excess_mi)) %>%
   dplyr::mutate(across(undiagnosed_quintile, as_factor))
 
 ggplot(north_east_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
@@ -2988,14 +3047,16 @@ ggplot(north_east_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_
 # North-West
 north_west_undiagnosed <- abs_undiagnosed_lsoa_region %>%
   dplyr::filter(NHSER21NM == "North West") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5),
+                excess_stroke = floor(undiagnosed/67), 
+                excess_mi = floor(undiagnosed/118)) 
 
 north_west_undiagnosed_grouped <- north_west_undiagnosed %>%
   group_by(undiagnosed_quintile) %>%
   summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed)) %>%
-  dplyr::mutate(excess_stroke = round(undiagnosed/67), 
-                excess_mi = round(undiagnosed/118)) %>%
+            undiagnosed = sum(undiagnosed), 
+            excess_stroke = sum(excess_stroke), 
+            excess_mi = sum(excess_mi)) %>%
   dplyr::mutate(across(undiagnosed_quintile, as_factor))
 
 ggplot(north_west_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
@@ -3009,14 +3070,16 @@ ggplot(north_west_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_
 # South-East
 south_east_undiagnosed <- abs_undiagnosed_lsoa_region %>%
   dplyr::filter(NHSER21NM == "South East") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5),
+                excess_stroke = floor(undiagnosed/67), 
+                excess_mi = floor(undiagnosed/118)) 
 
 south_east_undiagnosed_grouped <- south_east_undiagnosed %>%
   group_by(undiagnosed_quintile) %>%
   summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed)) %>%
-  dplyr::mutate(excess_stroke = round(undiagnosed/67), 
-                excess_mi = round(undiagnosed/118)) %>%
+            undiagnosed = sum(undiagnosed), 
+            excess_stroke = sum(excess_stroke), 
+            excess_mi = sum(excess_mi)) %>%
   dplyr::mutate(across(undiagnosed_quintile, as_factor))
 
 ggplot(south_east_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
@@ -3030,14 +3093,16 @@ ggplot(south_east_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_
 # South-West
 south_west_undiagnosed <- abs_undiagnosed_lsoa_region %>%
   dplyr::filter(NHSER21NM == "South West") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5),
+                excess_stroke = floor(undiagnosed/67), 
+                excess_mi = floor(undiagnosed/118)) 
 
 south_west_undiagnosed_grouped <- south_west_undiagnosed %>%
   group_by(undiagnosed_quintile) %>%
   summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed)) %>%
-  dplyr::mutate(excess_stroke = round(undiagnosed/67), 
-                excess_mi = round(undiagnosed/118)) %>%
+            undiagnosed = sum(undiagnosed), 
+            excess_stroke = sum(excess_stroke), 
+            excess_mi = sum(excess_mi)) %>%
   dplyr::mutate(across(undiagnosed_quintile, as_factor))
 
 ggplot(south_west_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
