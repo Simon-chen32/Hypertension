@@ -2880,17 +2880,15 @@ decile_cumulative <- lsoa_undiagnosed %>%
          undiagnosed_per_100000 = round(undiagnosed/(population/100000), digits = 2))
 
 undiagnosed_decile <- lsoa_undiagnosed %>%
-  dplyr::mutate(ntile = ntile(undiagnosed, 5), 
-                excess_stroke = floor(undiagnosed/67), 
-                excess_mi = floor(undiagnosed/118)) %>%
+  dplyr::mutate(ntile = ntile(undiagnosed, 5)) %>%
   mutate(across(ntile, as_factor))
 
 undiagnosed_decile_grouped <- undiagnosed_decile %>%
   dplyr::group_by(ntile) %>%
   summarise(undiagnosed = sum(undiagnosed), 
-            population = sum(lsoa_pop), 
-            excess_stroke = sum(excess_stroke), 
-            excess_mi = sum(excess_mi)) 
+            population = sum(lsoa_pop)) %>%
+  mutate(excess_stroke = floor(undiagnosed/67), 
+         excess_mi = floor(undiagnosed/118))
 
 decile_cumulative_long <- decile_cumulative%>%
   pivot_longer(cols = c('undiagnosed', 'hypertension_pop'), 
@@ -2954,17 +2952,15 @@ ggplot(regional_missed_excess, aes(x = NHSER21NM, y = excess_stroke)) +
 # Midlands Specific 
 midlands_undiagnosed <- abs_undiagnosed_lsoa_region %>%
   dplyr::filter(NHSER21NM == "Midlands") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5),
-                excess_stroke = floor(undiagnosed/67), 
-                excess_mi = floor(undiagnosed/118)) 
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
 
 midlands_undiagnosed_grouped <- midlands_undiagnosed %>%
   group_by(undiagnosed_quintile) %>%
   summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed), 
-            excess_stroke = sum(excess_stroke), 
-            excess_mi = sum(excess_mi)) %>%
-  dplyr::mutate(across(undiagnosed_quintile, as_factor))
+            undiagnosed = sum(undiagnosed)) %>%
+  dplyr::mutate(across(undiagnosed_quintile, as_factor),
+                excess_stroke = floor(undiagnosed/67), 
+                excess_mi = floor(undiagnosed/118))
 
 ggplot(midlands_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
   stat_pareto(point.color = "red", 
@@ -2977,17 +2973,15 @@ ggplot(midlands_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_st
 # East of England 
 east_england_undiagnosed <- abs_undiagnosed_lsoa_region %>%
   dplyr::filter(NHSER21NM == "East of England") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5),
-                excess_stroke = floor(undiagnosed/67), 
-                excess_mi = floor(undiagnosed/118)) 
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
 
 east_england_undiagnosed_grouped <- east_england_undiagnosed %>%
   group_by(undiagnosed_quintile) %>%
   summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed), 
-            excess_stroke = sum(excess_stroke), 
-            excess_mi = sum(excess_mi)) %>%
-  dplyr::mutate(across(undiagnosed_quintile, as_factor))
+            undiagnosed = sum(undiagnosed)) %>%
+  dplyr::mutate(across(undiagnosed_quintile, as_factor),
+                excess_stroke = floor(undiagnosed/67), 
+                excess_mi = floor(undiagnosed/118))
 
 ggplot(east_england_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
   stat_pareto(point.color = "red", 
@@ -3000,17 +2994,15 @@ ggplot(east_england_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = exces
 # London 
 london_undiagnosed <- abs_undiagnosed_lsoa_region %>%
   dplyr::filter(NHSER21NM == "London") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5),
-                excess_stroke = floor(undiagnosed/67), 
-                excess_mi = floor(undiagnosed/118)) 
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
 
 london_undiagnosed_grouped <- london_undiagnosed %>%
   group_by(undiagnosed_quintile) %>%
   summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed), 
-            excess_stroke = sum(excess_stroke), 
-            excess_mi = sum(excess_mi)) %>%
-  dplyr::mutate(across(undiagnosed_quintile, as_factor))
+            undiagnosed = sum(undiagnosed)) %>%
+  dplyr::mutate(across(undiagnosed_quintile, as_factor),
+                excess_stroke = floor(undiagnosed/67), 
+                excess_mi = floor(undiagnosed/118))
 
 ggplot(london_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
   stat_pareto(point.color = "red", 
@@ -3024,17 +3016,15 @@ ggplot(london_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stro
 # North-East and Yorkshire 
 north_east_undiagnosed <- abs_undiagnosed_lsoa_region %>%
   dplyr::filter(NHSER21NM == "North East and Yorkshire") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5),
-                excess_stroke = floor(undiagnosed/67), 
-                excess_mi = floor(undiagnosed/118)) 
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
 
 north_east_undiagnosed_grouped <- north_east_undiagnosed %>%
   group_by(undiagnosed_quintile) %>%
   summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed), 
-            excess_stroke = sum(excess_stroke), 
-            excess_mi = sum(excess_mi)) %>%
-  dplyr::mutate(across(undiagnosed_quintile, as_factor))
+            undiagnosed = sum(undiagnosed)) %>%
+  dplyr::mutate(across(undiagnosed_quintile, as_factor),
+                excess_stroke = floor(undiagnosed/67), 
+                excess_mi = floor(undiagnosed/118))
 
 ggplot(north_east_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
   stat_pareto(point.color = "red", 
@@ -3047,17 +3037,15 @@ ggplot(north_east_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_
 # North-West
 north_west_undiagnosed <- abs_undiagnosed_lsoa_region %>%
   dplyr::filter(NHSER21NM == "North West") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5),
-                excess_stroke = floor(undiagnosed/67), 
-                excess_mi = floor(undiagnosed/118)) 
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
 
 north_west_undiagnosed_grouped <- north_west_undiagnosed %>%
   group_by(undiagnosed_quintile) %>%
   summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed), 
-            excess_stroke = sum(excess_stroke), 
-            excess_mi = sum(excess_mi)) %>%
-  dplyr::mutate(across(undiagnosed_quintile, as_factor))
+            undiagnosed = sum(undiagnosed)) %>%
+  dplyr::mutate(across(undiagnosed_quintile, as_factor),
+                excess_stroke = floor(undiagnosed/67), 
+                excess_mi = floor(undiagnosed/118))
 
 ggplot(north_west_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
   stat_pareto(point.color = "red", 
@@ -3070,17 +3058,15 @@ ggplot(north_west_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_
 # South-East
 south_east_undiagnosed <- abs_undiagnosed_lsoa_region %>%
   dplyr::filter(NHSER21NM == "South East") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5),
-                excess_stroke = floor(undiagnosed/67), 
-                excess_mi = floor(undiagnosed/118)) 
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
 
 south_east_undiagnosed_grouped <- south_east_undiagnosed %>%
   group_by(undiagnosed_quintile) %>%
   summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed), 
-            excess_stroke = sum(excess_stroke), 
-            excess_mi = sum(excess_mi)) %>%
-  dplyr::mutate(across(undiagnosed_quintile, as_factor))
+            undiagnosed = sum(undiagnosed)) %>%
+  dplyr::mutate(across(undiagnosed_quintile, as_factor),
+                excess_stroke = floor(undiagnosed/67), 
+                excess_mi = floor(undiagnosed/118))
 
 ggplot(south_east_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
   stat_pareto(point.color = "red", 
@@ -3093,17 +3079,15 @@ ggplot(south_east_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_
 # South-West
 south_west_undiagnosed <- abs_undiagnosed_lsoa_region %>%
   dplyr::filter(NHSER21NM == "South West") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5),
-                excess_stroke = floor(undiagnosed/67), 
-                excess_mi = floor(undiagnosed/118)) 
+  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
 
 south_west_undiagnosed_grouped <- south_west_undiagnosed %>%
   group_by(undiagnosed_quintile) %>%
   summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed), 
-            excess_stroke = sum(excess_stroke), 
-            excess_mi = sum(excess_mi)) %>%
-  dplyr::mutate(across(undiagnosed_quintile, as_factor))
+            undiagnosed = sum(undiagnosed)) %>%
+  dplyr::mutate(across(undiagnosed_quintile, as_factor),
+                excess_stroke = floor(undiagnosed/67), 
+                excess_mi = floor(undiagnosed/118))
 
 ggplot(south_west_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
   stat_pareto(point.color = "red", 
