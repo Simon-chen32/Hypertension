@@ -5,17 +5,14 @@ setwd("~/Hypertension")
 library(tidyverse)
 library(tmap)
 library(sf)
-library(sp)
-library(spdep)
 library(janitor)
-library(sf)
 library(stringr)
 library(ggplot2)
 library(RColorBrewer)
-library(plotly)
 library(ggQC)
 library(scales)
 library(waterfalls)
+
 
 #### Loading Data #####
 # Loading in Shapefile
@@ -50,8 +47,7 @@ Eng_CCG$CCG21NM[Eng_CCG$CCG21NM=="NHS Birmingham and Solihull CCG"] <- "NHS Birm
 ENG_LSOA21 <- st_read("~/Hypertension/LSOA Shapefiles/LSOA_2021_EW_BFE_V5.shp")
 ENG_LSOA11 <- st_read("~/Hypertension/LSOA Shapefiles/infuse_lsoa_lyr_2011.shp") %>% 
   filter(str_detect(geo_code, '^E'))
-London_2011 <- st_read("~/Hypertension/LSOA Shapefiles/statistical-gis-boundaries-london/ESRI/LSOA_2011_London_gen_MHW.shp") %>%
-  subset(., select = -c(RGN11CD:AVHHOLDSZ))
+London_2011 <- st_read("~/Hypertension/LSOA Shapefiles/statistical-gis-boundaries-london/ESRI/LSOA_2011_London_gen_MHW.shp")
 
 # Loading in GP Data
 GP_age_dist <- read_csv("~/Hypertension/Population Age Distributions/gp-reg-pat-prac-quin-age-sep-22.csv") %>%
@@ -1278,34 +1274,6 @@ ggplot(london_imd, aes(x = imd_score, y = obs_over_exp)) +
   stat_smooth(method = 'lm', col = 'red', size = 1) + 
   labs(x = "IMD Score", y = "Reported Prevalence to Expected")
 
-#### For Methods Club Presentaiton ####
-imd_reg <- lm(age_std_prev ~ imd_score, data = london_imd)
-summary(imd_reg)
-
-london_subset$RESIDUALS <- imd_reg$residuals
-summary(london_subset$RESIDUALS)
-
-tm_shape(london_subset) + 
-  tm_fill("RESIDUALS", style = "cont", midpoint = 0, palette = "-RdBu") + 
-  tm_compass(position = c("right", "top")) + 
-  tm_scale_bar(position = c("left", "bottom")) +
-  tm_layout(frame = FALSE) +
-tm_shape(london_ccg) + 
-  tm_borders()
-
-#generate unique number for each row
-london_subset$ROWNUM <- 1:nrow(london_subset)
-# We need to coerce the sf spatialdatafile object into a new sp object
-london_hyper_sp <- as(london_subset, "Spatial")
-# Create spatial weights matrix for areas
-Weights <- poly2nb(london_hyper_sp, row.names = london_hyper_sp$ROWNUM)
-WeightsMatrix <- nb2mat(Weights, style='B')
-Residual_WeightMatrix <- mat2listw(WeightsMatrix , style='W')
-# Run the test on the regression model output object "modelMLR" using lm.morantest()
-lm.morantest(imd_reg, Residual_WeightMatrix, alternative="two.sided")
-
-###########
-
 # Create a second set Shapefile for Deprivation Prevalence 
 lsoa_ccg_region <- merge(lsoa_ccg_shp, ccg_region, by = c('CCG21CD', 'CCG21NM', 'CCG21CDH'))
 
@@ -1410,6 +1378,7 @@ abs_gp_hyper <- merge(undiagnosed_hyp_prev, GP_lsoa_data, by = 'practice_code', 
          lsoa_code, lsoa_pop, sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
   # Calculating total undiagnosed by GP 
   mutate(undiagnosed_totals = (undiagnosed_hyp/100)*number_of_patients, 
+         undiagnosed_v2 = number_of_patients*0.1125633,
          gp_coverage = number_of_patients/lsoa_pop)
 
 # Aggregating at LSOA level 
@@ -1417,7 +1386,8 @@ abs_undiagnosed_lsoa <- abs_gp_hyper %>%
   group_by(lsoa_code) %>%
   summarise(undiagnosed_prev = sum(gp_coverage*undiagnosed_hyp, na.rm = TRUE), 
             lsoa_pop = mean(lsoa_pop)) %>%
-  mutate(undiagnosed = round(undiagnosed_prev*lsoa_pop/100))
+  mutate(undiagnosed = round(undiagnosed_prev*lsoa_pop/100), 
+         undiagnosed_v2 = round(0.1125633*lsoa_pop))
 
 abs_undiagnosed_lsoa_ccg <- merge(abs_undiagnosed_lsoa, lsoa_ccg_pop_merge, by = c('lsoa_code', 'lsoa_pop')) %>%
   select(-c(FID, LAD21CD, LAD21NM))
@@ -1427,16 +1397,21 @@ abs_undiagnosed_lsoa_region <- merge(abs_undiagnosed_lsoa_ccg, ccg_region, by = 
 # Aggregating at ICS level
 sub_icb_abs <- abs_gp_hyper %>%
   group_by(sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
-  summarise(undiagnosed_hypertension = round(sum(undiagnosed_totals, na.rm = TRUE),digits = 0), 
+  summarise(undiagnosed_hypertension = round(sum(undiagnosed_totals, na.rm = TRUE),digits = 0),
+            undiagnosed_v2 = sum(undiagnosed_v2),
             sub_icb_pop = sum(number_of_patients))
 
 # Aggregating at Regional Level
 regional_abs_undiagnosed <- merge(sub_icb_abs, ccg_region, by.x = 'sub_icb_loc_ods_code', by.y = 'CCG21CDH') %>%
   group_by(NHSER21NM, NHSER21CD) %>%
   summarise(tot_undiagnosed = sum(undiagnosed_hypertension), 
+            undiagnosed_v2 = sum(undiagnosed_v2),
             region_population = sum(sub_icb_pop)) %>%
   mutate(rate_per_100000 = round(tot_undiagnosed/(region_population/100000), digits = 2), 
          undiagnosed_prev = round(tot_undiagnosed/region_population*100, digits = 2))
+
+# Mean HSE England percentage is 25.58151
+# Subtract from QOF average of 14.32518 to get 11.25633 Undiagnosed 
 
 #### Objective 3 ####
 #### Loading in QOF data from 2014-15 to 2019-20 ####
@@ -2797,12 +2772,12 @@ undiagnosed_excess <- sub_icb_abs %>%
          undiagnosed_per_100000 = round(undiagnosed_hypertension/(sub_icb_pop/100000), digits = 2))
 
 regional_undiagnosed_excess <- regional_abs_undiagnosed %>%
-  mutate(excess_stroke = round(tot_undiagnosed/67), 
-         excess_stroke_LB = round(tot_undiagnosed/84), 
-         excess_stroke_UB = round(tot_undiagnosed/57), 
-         excess_mi = round(tot_undiagnosed/118), 
-         excess_mi_LB = round(tot_undiagnosed/171), 
-         excess_mi_UB = round(tot_undiagnosed/94))
+  mutate(excess_stroke = floor(tot_undiagnosed/67), 
+         excess_stroke_LB = floor(tot_undiagnosed/84), 
+         excess_stroke_UB = floor(tot_undiagnosed/57), 
+         excess_mi = floor(tot_undiagnosed/118), 
+         excess_mi_LB = floor(tot_undiagnosed/171), 
+         excess_mi_UB = floor(tot_undiagnosed/94))
 
 # Finding the impact of missed diagnosis due to COVID
 sub_icb_missed_excess <- missed_all %>%
@@ -2830,6 +2805,9 @@ regional_missed_excess <- regional_totals %>%
 regional_missed_excess$NHSER21NM <- factor(regional_missed_excess$NHSER21NM, 
                                            levels = rev(sort(regional_missed_excess$NHSER21NM)))
 
+regional_undiagnosed_excess$NHSER21NM <- factor(regional_undiagnosed_excess$NHSER21NM, 
+                                                levels = rev(sort(regional_undiagnosed_excess$NHSER21NM)))
+
 regional_missed_excess_long <- regional_missed_excess %>%
   pivot_longer(cols = c("stroke", "mi"), 
                names_to = "CVD",
@@ -2850,6 +2828,44 @@ UB <- regional_missed_excess %>%
 
 region_missed_long <- cbind(regional_missed_excess_long, LB, UB) %>%
   select(-c(7:10, 13:16))
+
+### Undiagnosed
+regional_undiagnosed_excess_long <- regional_undiagnosed_excess %>%
+  pivot_longer(cols = c("excess_stroke", "excess_mi"), 
+               names_to = "CVD",
+               values_to = "excess", 
+               names_prefix = "excess_") %>%
+  select(-c(excess_stroke_LB:excess_mi_UB))
+
+undiagnosed_LB <- regional_undiagnosed_excess %>%
+  pivot_longer(cols = c("excess_stroke_LB", "excess_mi_LB"), 
+               names_to = "CVD_LB",
+               names_prefix = "excess_",
+               values_to = "LB") %>%
+  select(-c(excess_stroke:excess_mi_UB))
+
+undiagnosed_UB <- regional_undiagnosed_excess %>%
+  pivot_longer(cols = c("excess_stroke_UB", "excess_mi_UB"), 
+               names_to = "CVD_UB",
+               names_prefix = "excess_",
+               values_to = "UB") %>%
+  select(-c(excess_stroke:excess_mi_LB))
+
+region_undiagnosed_long <- cbind(regional_undiagnosed_excess_long, undiagnosed_LB, undiagnosed_UB) %>%
+  select(-c(4:7,10:17,19:26)) %>%
+  rename(NHSER21NM = NHSER21NM...1, 
+         NHSER21CD = NHSER21CD...2, 
+         undiagnosed = tot_undiagnosed...3)
+
+ggplot(region_undiagnosed_long, aes(x = NHSER21NM, y = excess, 
+                               fill = CVD)) +
+  scale_fill_manual('CVD Type', values = c("#e93f6f", "#00a3c7"), 
+                    labels = c("MI", "Stroke")) + 
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = LB, ymax = UB), width = .2, position = position_dodge(1)) +
+  coord_flip() + 
+  labs(title = "CVD Events by Region", x = "Region", 
+       y = "Number of Events") 
 
 #### Plotting Missed ####
 ggplot(region_missed_long, aes(x = NHSER21NM, y = excess, 
@@ -2873,10 +2889,14 @@ lsoa_undiagnosed <- merge(lsoa_age_adj, abs_undiagnosed_lsoa, by = c('lsoa_code'
 decile_cumulative <- lsoa_undiagnosed %>%
   group_by(obs_decile) %>%
   summarise(undiagnosed = sum(undiagnosed), 
+            undiagnosed_hse_crude = sum(undiagnosed_v2),
             population = sum(lsoa_pop),
-            hypertension_pop = sum(hypertension_cases)) %>%
+            hypertension_pop = sum(hypertension_cases), 
+            undiagnosed_NCD = (undiagnosed*0.369)/0.631) %>%
   mutate(excess_stroke = floor(undiagnosed/67),
+         excess_stroke_v2 = floor(undiagnosed_hse_crude/67), 
          excess_mi = floor(undiagnosed/118), 
+         excess_mi_v2 = floor(undiagnosed_hse_crude/118),
          undiagnosed_per_100000 = round(undiagnosed/(population/100000), digits = 2))
 
 undiagnosed_decile <- lsoa_undiagnosed %>%
@@ -2922,11 +2942,22 @@ ggplot(undiagnosed_decile, aes(x = ntile, y = excess_stroke)) +
 ggplot(decile_cumulative, aes(x = obs_decile, fill = obs_decile)) +
   scale_fill_brewer(palette = "RdBu", direction = -1) + 
   geom_col(aes(y = hypertension_pop/1000)) +
-  geom_point(aes(y = undiagnosed/1000), size = 3) +
-  geom_path(aes(y = undiagnosed/1000, group = 1)) +
+  geom_point(aes(y = undiagnosed_hse_crude/1000), size = 3) +
+  geom_path(aes(y = undiagnosed_hse_crude/1000, group = 1)) +
   labs(title = "Hypertension Population Distribution", x = "Hypertension Prevalence Decile", 
        y = "Hypertension Population (in 1000s)") +
   geom_text(aes(1, 750, label = 'Undiagnosed Population', vjust = -1.5, hjust = 0.25)) +
+  scale_y_continuous(sec.axis = sec_axis(~., name = "Undiagnosed Population (in 1000s)")) +
+  theme(legend.position =  "none")
+
+ggplot(decile_cumulative, aes(x = obs_decile, fill = obs_decile)) +
+  scale_fill_brewer(palette = "RdBu", direction = -1) + 
+  geom_col(aes(y = hypertension_pop/1000)) +
+  geom_point(aes(y = undiagnosed_NCD/1000), size = 3) +
+  geom_path(aes(y = undiagnosed_NCD/1000, group = 1)) +
+  labs(title = "Hypertension Population Distribution", x = "Hypertension Prevalence Decile", 
+       y = "Hypertension Population (in 1000s)") +
+  geom_text(aes(1, 750, label = 'Undiagnosed Population', vjust = 10, hjust = -1)) +
   scale_y_continuous(sec.axis = sec_axis(~., name = "Undiagnosed Population (in 1000s)")) +
   theme(legend.position =  "none")
 
