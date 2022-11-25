@@ -16,7 +16,7 @@ library(waterfalls)
 
 #### Loading Data #####
 # Loading in Shapefile
-Eng_CCG <- st_read("~/Hypertension/CCG Geography/CCG_APR_2021_EN_BFC.shp")
+Eng_CCG <- st_read("~/Hypertension/CCG Shapefiles/CCG_APR_2021_EN_BFC.shp")
 
 # Renaming and Recoding CCG labels following the most recent changes to CCG/ICB names
 # Northamptonshire
@@ -2852,7 +2852,7 @@ undiagnosed_UB <- regional_undiagnosed_excess %>%
   select(-c(excess_stroke:excess_mi_LB))
 
 region_undiagnosed_long <- cbind(regional_undiagnosed_excess_long, undiagnosed_LB, undiagnosed_UB) %>%
-  select(-c(4:7,10:17,19:26)) %>%
+  select(-c(4:6,9:15,17:23)) %>%
   rename(NHSER21NM = NHSER21NM...1, 
          NHSER21CD = NHSER21CD...2, 
          undiagnosed = tot_undiagnosed...3)
@@ -2886,6 +2886,7 @@ lsoa_undiagnosed <- merge(lsoa_age_adj, abs_undiagnosed_lsoa, by = c('lsoa_code'
   mutate(hypertension_cases = round(obs_hyper_prev*lsoa_pop/100))
 
 # Done by Prevalence Decile
+#### Creating Deciles ####
 decile_cumulative <- lsoa_undiagnosed %>%
   group_by(obs_decile) %>%
   summarise(undiagnosed = sum(undiagnosed), 
@@ -3324,3 +3325,19 @@ waterfall(values = south_west_undiagnosed_grouped$excess_mi,
        y = "Excess MIs") +
   scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
                               "Quintile 5", "Total"))
+
+#### Mapping ####
+# mapping where the events are
+top_quintile_undiagnosed <- undiagnosed_decile %>%
+  filter(ntile == 5)
+
+top_quin_undiagnosed_shp <- merge(ENG_LSOA11, top_quintile_undiagnosed, by.x = "geo_code", by.y = "lsoa_code")
+
+tm_shape(Eng_CCG) + 
+  tm_borders(col = "black") +
+tm_shape(top_quin_undiagnosed_shp) + 
+  tm_fill(col = "undiagnosed", palette = "Reds", breaks = c(250, 300, 350, 400, 450, 500, Inf), 
+          title = "No. Undiagnosed") +
+  tm_compass(position = c("left", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_layout(main.title = "Location of Top Quintile of Undiagnosed Hypertension LSOAs", legend.outside = T)
