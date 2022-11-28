@@ -296,11 +296,6 @@ lsoa_age_adj <- lsoa_grouped %>%
          age_std_prev = mean(obs_hyper_prev)*obs_over_exp, 
          age_std_u79_prev = mean(obs_u79_prev)*u79_obs_over_exp)
 
-# Finding the Top Decile of LSOAs by Prevalence
-lsoa_age_adj$percentile <- ntile(lsoa_age_adj$age_std_prev, 100)
-lsoa_age_adj$obs_decile <- ntile(lsoa_age_adj$obs_hyper_prev, 10)
-
-
 # Merging at CCG 
 ccg_grouped <- merge(lsoa_age_adj, lsoa_ccg_la, by.x = 'lsoa_code', by.y = 'LSOA11CD') 
 
@@ -1546,19 +1541,15 @@ QOF_prev_pop_std <- merge(QOF_prev_21_22_std, ccg_pop, by.x = 'ccg_code', by.y =
 # Finding Absolute Values in Differences
 missed_21 <- QOF_prev_pop %>%
   filter(year == 6) %>%
-  select(., -c(exp_prevalence, ratio, year, covid)) %>%
-  rename(obs_prev_21 = obs_prevalence, 
-         age_std_prev_21 = age_std_prevalence, 
-         pred_prev_21 = predicted_prev, 
+  select(., -c(year, covid)) %>%
+  rename(obs_prev_21 = obsprev, 
          prev_diff_21 = prev_diff,
          undiagnosed_21 = undiagnosed)
 
 missed_22 <- QOF_prev_pop %>%
   filter(year == 7) %>%
-  select(., -c(exp_prevalence, ratio, year, covid)) %>%
-  rename(obs_prev_22 = obs_prevalence, 
-         age_std_prev_22 = age_std_prevalence, 
-         pred_prev_22 = predicted_prev, 
+  select(., -c(year, covid)) %>%
+  rename(obs_prev_22 = obsprev, 
          prev_diff_22 = prev_diff,
          undiagnosed_22 = undiagnosed)
 
@@ -1616,7 +1607,7 @@ ggplot(abs_hyper_region, aes(x = NHSER21NM, y = undiagnosed_22, fill = CCG21NM))
 # Find Regional values 
 regional_totals <- abs_hyper_region %>%
   group_by(NHSER21NM) %>%
-  summarise(missed_diagnoses_total = round(sum(undiagnosed_21), 0), 
+  summarise(missed_diagnoses_total = round(sum(undiagnosed_22), 0), 
             region_pop = sum(sub_icb_pop))
 
 regional_totals_std <- abs_hyper_region_std %>%
@@ -1654,7 +1645,14 @@ undiagnosed_excess <- sub_icb_abs %>%
          excess_mi = round(undiagnosed_hypertension/118),
          excess_mi_LB = round(undiagnosed_hypertension/171), 
          excses_mi_UB = round(undiagnosed_hypertension/94), 
-         undiagnosed_per_100000 = round(undiagnosed_hypertension/(sub_icb_pop/100000), digits = 2))
+         undiagnosed_per_100000 = round(undiagnosed_hypertension/(sub_icb_pop/100000), digits = 2), 
+         excess_stroke80 = round(undiagnosed_hypertension*0.8/67), 
+         excess_stroke80_LB = round(undiagnosed_hypertension*0.8/84), 
+         excess_stroke80_UB = round(undiagnosed_hypertension*0.8/57), 
+         excess_mi80 = round(undiagnosed_hypertension*0.8/118), 
+         excess_mi80_LB = round(undiagnosed_hypertension*0.8/171), 
+         excess_mi80_UB = round(undiagnosed_hypertension*0.8/94)) %>%
+  drop_na()
 
 regional_undiagnosed_excess <- regional_abs_undiagnosed %>%
   mutate(excess_stroke = floor(tot_undiagnosed/67), 
@@ -1763,13 +1761,6 @@ ggplot(region_missed_long, aes(x = NHSER21NM, y = excess,
   labs(title = "CVD Events by Region", x = "Region", 
        y = "Number of Events") 
 
-
-# Then plot pareto and waterfall charts for Number of Cases of MI, Stroke and Hypertension
-lsoa_undiagnosed <- merge(lsoa_age_adj, abs_undiagnosed_lsoa, by = c('lsoa_code', 'lsoa_pop')) %>%
-  mutate(across(hypertension_classification, as_factor)) %>%
-  mutate(across(obs_decile, as_factor)) %>%
-  mutate(hypertension_cases = round(obs_hyper_prev*lsoa_pop/100))
-
 # Done by Prevalence Decile
 #### Creating Deciles ####
 decile_cumulative <- lsoa_undiagnosed %>%
@@ -1857,7 +1848,7 @@ ggplot(decile_cumulative_long, aes(x = obs_decile, y = occurances/1000,
 
 
 # Done by Region
-ggplot(regional_missed_excess, aes(x = NHSER21NM, y = excess_stroke)) +
+ggplot(regional_undiagnosed_excess, aes(x = NHSER21NM, y = excess_stroke)) +
   stat_pareto(point.color = "red", 
               point.size = 2, 
               line.color = "black") + 
@@ -1865,8 +1856,51 @@ ggplot(regional_missed_excess, aes(x = NHSER21NM, y = excess_stroke)) +
        x = "NHS England Region", 
        y = "Prevented Cases of Stroke")
 
+# adjusting right hand axis 
+undiagnosed_excess_stroke <- undiagnosed_excess[order(undiagnosed_excess$undiagnosed_hypertension, 
+                                               decreasing = T), ]
 
-# Midlands Specific 
+undiagnosed_excess_stroke$sub_icb_loc_name <- factor(undiagnosed_excess_stroke$sub_icb_loc_name, 
+                                              levels = undiagnosed_excess_stroke$sub_icb_loc_name)
+
+undiagnosed_excess_stroke$cumulative <- cumsum(undiagnosed_excess_stroke$excess_stroke) 
+
+undiagnosed_excess_stroke$cumulative <- 100 * undiagnosed_excess_stroke$cumulative/tail(undiagnosed_excess_stroke$cumulative, n = 1)
+
+scaleRight <- tail(undiagnosed_excess_stroke$cumulative, n = 1)/head(undiagnosed_excess_stroke$excess_stroke, n = 1)
+
+ggplot(undiagnosed_excess_stroke, aes(x = sub_icb_loc_name)) +
+  geom_bar(aes(y = excess_stroke), fill = "#002f5f", stat = "identity") + 
+  geom_path(aes(y = cumulative/scaleRight, group = 1), color = "red") + 
+  geom_point(aes(y = cumulative/scaleRight, group = 1), color = 'black') + 
+  scale_y_continuous(sec.axis = sec_axis(~.*scaleRight, name = "Cumulative (%)")) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  labs(title = 'Preventable Strokes by ICS', 
+       x = 'ICS', y = 'Prevented Cases of Stroke')
+
+undiagnosed_excess_mi <- undiagnosed_excess[order(undiagnosed_excess$undiagnosed_hypertension, 
+                                                      decreasing = T), ]
+
+undiagnosed_excess_mi$sub_icb_loc_name <- factor(undiagnosed_excess_mi$sub_icb_loc_name, 
+                                                     levels = undiagnosed_excess_mi$sub_icb_loc_name)
+
+undiagnosed_excess_mi$cumulative <- cumsum(undiagnosed_excess_mi$excess_mi) 
+
+undiagnosed_excess_mi$cumulative <- 100 * undiagnosed_excess_mi$cumulative/tail(undiagnosed_excess_mi$cumulative, n = 1)
+
+scaleRight_MI <- tail(undiagnosed_excess_mi$cumulative, n = 1)/head(undiagnosed_excess_mi$excess_mi, n = 1)
+
+ggplot(undiagnosed_excess_mi, aes(x = sub_icb_loc_name)) +
+  geom_bar(aes(y = excess_mi), fill = "#002f5f", stat = "identity") + 
+  geom_path(aes(y = cumulative/scaleRight_MI, group = 1), color = "red") + 
+  geom_point(aes(y = cumulative/scaleRight_MI, group = 1), color = 'black') + 
+  scale_y_continuous(sec.axis = sec_axis(~.*scaleRight_MI, name = "Cumulative (%)")) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  labs(title = 'Preventable MI by ICS', 
+       x = 'ICS', y = 'Prevented Cases of MI')
+
+
+#### Regional Pareto Charts ####
 midlands_undiagnosed <- abs_undiagnosed_lsoa_region %>%
   dplyr::filter(NHSER21NM == "Midlands") %>%
   dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
@@ -2216,7 +2250,8 @@ waterfall(values = south_west_undiagnosed_grouped$excess_mi,
 top_quintile_undiagnosed <- undiagnosed_decile %>%
   filter(ntile == 5)
 
-top_quin_undiagnosed_shp <- merge(ENG_LSOA11, top_quintile_undiagnosed, by.x = "geo_code", by.y = "lsoa_code")
+top_quin_undiagnosed_shp <- merge(ENG_LSOA11, top_quintile_undiagnosed, by.x = "geo_code", by.y = "lsoa_code") %>%
+  select(-c(geo_label, geo_labelw, label))
 
 tm_shape(Eng_CCG) + 
   tm_borders(col = "black") +
@@ -2226,3 +2261,99 @@ tm_shape(top_quin_undiagnosed_shp) +
   tm_compass(position = c("left", "top")) + 
   tm_scale_bar(position = c("right", "bottom")) + 
   tm_layout(main.title = "Location of Top Quintile of Undiagnosed Hypertension LSOAs", legend.outside = T)
+
+# Merge LSOA to CCG to Region to plot Regionally 
+lsoa_region <- left_join(lsoa_ccg_la, ccg_region) %>%
+  select(-c(LAD21CD, LAD21NM))
+
+top_quin_shp_region <- merge(top_quin_undiagnosed_shp, lsoa_region, by.x = 'geo_code', by.y = 'LSOA11CD')
+
+east_eng_top_quin <- subset(top_quin_shp_region, NHSER21NM == 'East of England')
+london_top_quin <- subset(top_quin_shp_region, NHSER21NM=="London")
+midlands_top_quin <- subset(top_quin_shp_region, NHSER21NM == "Midlands")
+north_east_top_quin <- subset(top_quin_shp_region, NHSER21NM == 'North East and Yorkshire')
+north_west_top_quin <- subset(top_quin_shp_region, NHSER21NM == 'North West')
+south_east_top_quin <- subset(top_quin_shp_region, NHSER21NM == 'South East')
+south_west_top_quin <- subset(top_quin_shp_region, NHSER21NM == 'South West')
+
+ 
+tm_shape(east_eng_top_quin) + 
+  tm_fill(col = "undiagnosed", palette = "Reds", breaks = c(250, 300, 350, 400, 450, 500, Inf), 
+          title = "No. Undiagnosed") +
+  tm_compass(position = c("left", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_layout(main.title = "Top Quintile of Undiagnosed Hypertension LSOAs in East England", legend.outside = T) +
+tm_shape(east_eng_ccg) + 
+  tm_borders(col = "black")
+
+tm_shape(london_top_quin) + 
+  tm_fill(col = "undiagnosed", palette = "Reds", breaks = c(250, 300, 350, 400, 450, 500, Inf), 
+          title = "No. Undiagnosed") +
+  tm_compass(position = c("left", "top")) + 
+  tm_scale_bar(position = c("left", "bottom")) + 
+  tm_layout(main.title = "Top Quintile of Undiagnosed Hypertension LSOAs in London", legend.outside = T) +
+tm_shape(london_ccg) + 
+  tm_borders(col = "black")
+
+tm_shape(midlands_top_quin) + 
+  tm_fill(col = "undiagnosed", palette = "Reds", breaks = c(250, 300, 350, 400, 450, 500, Inf), 
+          title = "No. Undiagnosed") +
+  tm_compass(position = c("left", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_layout(main.title = "Top Quintile of Undiagnosed Hypertension LSOAs in the Midlands", legend.outside = T) +
+tm_shape(midlands_ccg) + 
+  tm_borders(col = "black")
+
+tm_shape(north_east_top_quin) + 
+  tm_fill(col = "undiagnosed", palette = "Reds", breaks = c(250, 300, 350, 400, 450, 500, Inf), 
+          title = "No. Undiagnosed") +
+  tm_compass(position = c("left", "top")) + 
+  tm_scale_bar(position = c("left", "bottom")) + 
+  tm_layout(main.title = "Top Quintile of Undiagnosed Hypertension LSOAs in NE England", legend.outside = T) +
+  tm_shape(north_east_ccg) + 
+  tm_borders(col = "black")
+
+tm_shape(north_west_top_quin) + 
+  tm_fill(col = "undiagnosed", palette = "Reds", breaks = c(250, 300, 350, 400, 450, 500, Inf), 
+          title = "No. Undiagnosed") +
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar(position = c("right", "bottom"), width = 0.2) + 
+  tm_layout(main.title = "Top Quintile of Undiagnosed Hypertension LSOAs in NW England", legend.outside = T) +
+  tm_shape(north_west_ccg) + 
+  tm_borders(col = "black")
+
+tm_shape(south_east_top_quin) + 
+  tm_fill(col = "undiagnosed", palette = "Reds", breaks = c(250, 300, 350, 400, 450, 500, Inf), 
+          title = "No. Undiagnosed") +
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_layout(main.title = "Top Quintile of Undiagnosed Hypertension LSOAs in SE England", legend.outside = T) +
+  tm_shape(south_east_ccg) + 
+  tm_borders(col = "black")
+
+tm_shape(south_west_top_quin) + 
+  tm_fill(col = "undiagnosed", palette = "Reds", breaks = c(250, 300, 350, 400, 450, 500, Inf), 
+          title = "No. Undiagnosed") +
+  tm_compass(position = c("left", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_layout(main.title = "Top Quintile of Undiagnosed Hypertension LSOAs in SW England", legend.outside = T) +
+  tm_shape(south_west_ccg) + 
+  tm_borders(col = "black")
+
+
+# Mapping Location of Top 25 ICS by Undiagnosed Hypertension/Stroke
+top25_undiagnosed <- undiagnosed_excess %>%
+  arrange(undiagnosed_hypertension) %>%
+  tail(25)
+
+top25_undiagnosed_shp <- merge(Eng_CCG, top25_undiagnosed, by.x = c('CCG21CD'), 
+                               by.y = c('sub_icb_loc_ons_code')) %>%
+  select(-c(OBJECTID:SHAPE_Area))
+
+tm_shape(Eng_CCG) + 
+  tm_borders(col = "black") +
+tm_shape(top25_undiagnosed_shp) + 
+  tm_fill(col = "#00a3c7", alpha = 0.6) + 
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_layout(main.title = "Top 25 ICS' by Undiagnosed Hypertension")
