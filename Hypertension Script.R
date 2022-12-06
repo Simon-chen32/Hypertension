@@ -781,8 +781,11 @@ ggplot(midlands_imd, aes(x = imd_score, y = obs_over_exp)) +
 
 # Try and break down CCG by MSOA/LSOA
 #### Including LSOA to MSOA Lookup file for Plotting Distribution of Prevalence ####
-lsoa_msoa <- read_csv("Output_Area_to_LSOA_to_MSOA_to_Local_Authority_District_(December_2017)_Lookup.csv") %>%
-  select(LSOA11CD, MSOA11CD, MSOA11NM)
+lsoa_msoa <- read_csv("~/Lookup Files/PCD_OA_LSOA_MSOA_LAD_AUG22_UK_LU.csv") %>%
+  select(lsoa11cd, msoa11cd, msoa11nm) %>%
+  group_by(lsoa11cd) %>%
+  summarise(msoa11cd = paste(unique(msoa11cd)), 
+            msoa11nm = paste(unique(msoa11nm)))
 
 # Selecting Stoke on Trent
 stoke_on_trent_hyp <- subset(midlands_imd, CCG21CD == 'E38000175')
@@ -1607,7 +1610,7 @@ ggplot(abs_hyper_region, aes(x = NHSER21NM, y = undiagnosed_22, fill = CCG21NM))
 # Find Regional values 
 regional_totals <- abs_hyper_region %>%
   group_by(NHSER21NM) %>%
-  summarise(missed_diagnoses_total = round(sum(undiagnosed_22), 0), 
+  summarise(missed_diagnoses_total = round(sum(undiagnosed_21), 0), 
             region_pop = sum(sub_icb_pop))
 
 regional_totals_std <- abs_hyper_region_std %>%
@@ -1651,7 +1654,9 @@ undiagnosed_excess <- sub_icb_abs %>%
          excess_stroke80_UB = round(undiagnosed_hypertension*0.8/57), 
          excess_mi80 = round(undiagnosed_hypertension*0.8/118), 
          excess_mi80_LB = round(undiagnosed_hypertension*0.8/171), 
-         excess_mi80_UB = round(undiagnosed_hypertension*0.8/94)) %>%
+         excess_mi80_UB = round(undiagnosed_hypertension*0.8/94), 
+         excess_stroke50 = round(undiagnosed_hypertension*0.5/67), 
+         excess_mi50 = round(undiagnosed_hypertension*0.5/118)) %>%
   drop_na()
 
 regional_undiagnosed_excess <- regional_abs_undiagnosed %>%
@@ -2357,3 +2362,59 @@ tm_shape(top25_undiagnosed_shp) +
   tm_compass(position = c("right", "top")) + 
   tm_scale_bar(position = c("right", "bottom")) + 
   tm_layout(main.title = "Top 25 ICS' by Undiagnosed Hypertension")
+
+#### Preparing Data for Ed ####
+lsoa_hypertension_data <- merge(lsoa_age_adj, abs_undiagnosed_lsoa_region, by = c('lsoa_code', 'lsoa_pop')) %>%
+  select(-c(obs_u79_prev:u79_obs_over_exp, age_std_u79_prev)) %>%
+  rename(LSOA11CD = lsoa_code, 
+         observed_hypertension_prevalence = obs_hyper_prev, 
+         age_std_hypertension_prevalence = age_std_prev,
+         undiagnosed_rate = undiagnosed_prev, 
+         number_undiagnosed = undiagnosed, 
+         SICBL22NM = CCG21NM, 
+         SICBL22CDH = CCG21CDH, 
+         SICBL22CD = CCG21CD) %>%
+  mutate(excess_stroke = floor(number_undiagnosed/67), 
+         excess_mi = floor(number_undiagnosed/118))
+
+lsoa_hypertension_data <- lsoa_hypertension_data[,c(1,10,3,4,8,2,9,13,14,5:7,11,12)]
+
+sub_icb_data <- left_join(sub_icb_abs, undiagnosed_excess)
+ccg_data <- left_join(ccg_agg, missed_21)
+
+ics_hypertension_data <- merge(ccg_data, sub_icb_data, by.x = c("CCG21CDH", "CCG21CD"), 
+                               by.y = c("sub_icb_loc_ods_code", "sub_icb_loc_ons_code")) %>%
+  select(-c(CCG21NM, avg_prevalence_21_22:obs_over_exp_22, avg_u79_achievement_21_22:ccg_code, prev_diff_21, 
+            excess_stroke_LB, excess_stroke_UB, excess_mi_LB, excses_mi_UB, excess_stroke80:50, 
+            sub_icb_pop.y, lsoa_pop_21_22)) %>%
+  rename(SICBL22CDH = CCG21CDH, 
+         SICBL22CD = CCG21CD, 
+         SICBL22NM = sub_icb_loc_name, 
+         observed_hypertension_prevalence = obs_prev_21, 
+         age_std_hypertension_prevalence = age_std_prev_21_22,
+         predicted_hypertension_prevalence = predicted_prev, 
+         sub_icb_population = sub_icb_pop.x,
+         missed_diagnoses = undiagnosed_21, 
+         number_undiagnosed = undiagnosed_hypertension,
+         undiagnosed_rate_per_100000 = undiagnosed_per_100000) %>%
+  mutate(missed_diagnoses = missed_diagnoses*(-1),
+         undiagnosed_rate = round(undiagnosed_rate_per_100000/1000, 2))
+
+ics_hypertension_data <- ics_hypertension_data[,c(1,2,8,4,3,13,6,9,5,7,10,11)]
+
+msoa_hypertension_data <- merge(lsoa_hypertension_data, lsoa_msoa, by.x = 'LSOA11CD', by.y = 'lsoa11cd') %>%
+  group_by(msoa11cd, msoa11nm) %>%
+  summarise(observed_hypertension_prevalence = mean(observed_hypertension_prevalence), 
+            age_std_hypertension_prevalence = mean(age_std_hypertension_prevalence), 
+            undiagnosed_rate = mean(undiagnosed_rate), 
+            msoa_pop = sum(lsoa_pop), 
+            number_undiagnosed = sum(number_undiagnosed), 
+            excess_stroke = sum(excess_stroke), 
+            excess_mi = sum(excess_mi),
+            SICBL22CD = paste(unique(SICBL22CD)), 
+            SICBL22NM = paste(unique(SICBL22NM)))
+  
+# Exporting as CSVs
+write_csv(lsoa_hypertension_data, "lsoa_hypertension_data.csv")
+write_csv(msoa_hypertension_data, "msoa_hypertension_data.csv")
+write_csv(ics_hypertension_data, "ics_hypertension_data.csv")
