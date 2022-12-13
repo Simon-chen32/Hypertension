@@ -141,6 +141,30 @@ GP_age_dist_cl <- GP_age_dist_cl %>%
 lsoa_age_dist <- read_csv("~/Hypertension/Population Age Distributions/lsoa_all_age_estimates.csv", skip = 4) %>%
   clean_names()
 
+lsoa_age_dist_5yr <- lsoa_age_dist %>%
+  mutate(age0_15 = rowSums(select(., x0:x15)), 
+         age16_24 = rowSums(select(., x16:x24)), 
+         age25_34 = rowSums(select(., x25:x34)), 
+         age35_44 = rowSums(select(., x35:x44)), 
+         age45_54 = rowSums(select(., x45:x54)), 
+         age55_64 = rowSums(select(., x55:x64)), 
+         age65_74 = rowSums(select(., x65:x74)), 
+         age75plus = rowSums(select(., x75:x90)), 
+         age16_24_perc = age16_24/all_ages, 
+         age25_34_perc = age25_34/all_ages, 
+         age35_44_perc = age35_44/all_ages, 
+         age45_54_perc = age45_54/all_ages, 
+         age55_64_perc = age55_64/all_ages, 
+         age65_74_perc = age65_74/all_ages, 
+         age75plus_perc = age75plus/all_ages) %>%
+  select(-starts_with('x'))
+
+lsoa_age_dist_5yr <- lsoa_age_dist_5yr %>%
+  mutate(exp_hyp_no_sex = age16_24_perc*0.01 + age25_34_perc*0.01 + age35_44_perc*0.03 + age45_54_perc*0.10 +
+           age55_64_perc*0.23 + age65_74_perc*0.34 + age75plus_perc*0.50)
+
+
+
 lsoa_age_dist_cl <- lsoa_age_dist %>%
   mutate(under79_pop = rowSums(select(., x0:x79)),
          over80_pop = rowSums(select(., x80:x90))) %>%
@@ -268,6 +292,41 @@ lsoa_hyper_prev <- merge(GP_lsoa_age_data, Hyper21_22_cl, by.x = 'org_code', by.
          tot_o80 = (number_of_patients/all_all)*total80plus,
          exp_hyp = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100, 
          exp_u79_hyp = (exp_u79_hyp_male*male_u79_perc + exp_u79_hyp_female*female_u79_perc)*100)
+
+gp_coverage <- lsoa_hyper_prev %>%
+  select(org_code, lsoa_code, lsoa_pop, number_of_patients, practice_name, 
+         gp_coverage, prevalence_percent_21_22, exp_hyp)
+gp_cov90 <- gp_coverage %>%
+  filter(gp_coverage >= 0.9)
+
+lsoa_med_age <- read_csv("~/Hypertension/Population Age Distributions/lsoa_median_age.csv", skip = 4) %>%
+  clean_names()
+
+gp_cov90_age_dist <- merge(gp_cov90, lsoa_med_age, by = 'lsoa_code') %>%
+  select_if(~ !any(is.na(.))) %>%
+  select(-c(la_code_2018_boundaries:la_name_2021_boundaries)) %>%
+  get_dupes(practice_name)
+
+diff_5plus <- gp_cov90_age_dist %>%
+  mutate(age_diff = median_age - lead(median_age)) 
+
+diff_filtered <- diff_5plus %>%
+  filter(age_diff <= -5 & practice_name == lead(practice_name) | 
+           age_diff >= 5 & practice_name == lead(practice_name)) 
+
+diff_10plus <- diff_5plus %>%
+  filter(age_diff <= -10 & practice_name == lead(practice_name) | 
+           age_diff >= 10 & practice_name == lead(practice_name)) 
+
+exp_diff5plus <- merge(diff_10plus, lsoa_age_dist_5yr, by = c('lsoa_code', 'lsoa_name')) %>%
+  select(-c(age0_15:age75plus_perc, starts_with('la'))) %>%
+  mutate(exp_diff = exp_hyp - exp_hyp_no_sex*100) %>%
+  filter(exp_diff <= -5 | exp_diff >= 5)
+
+obs_diff5plus <-  merge(diff_10plus, lsoa_age_dist_5yr, by = c('lsoa_code', 'lsoa_name')) %>%
+  select(-c(age0_15:age75plus_perc, starts_with('la'))) %>%
+  mutate(obs_diff = prevalence_percent_21_22 - exp_hyp_no_sex*100) %>%
+  filter(obs_diff <= -5 | obs_diff >= 5)
 
 ### Hypertension Analysis ####
 # checking the mean and median of hypertension prevalence by GP 
@@ -1128,7 +1187,7 @@ hse_hyper_prev <- merge(GP_age_dist_cl, hse_hyp_prev, by.x = 'org_code', by.y = 
   mutate(hse_exp_hyp = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100)
 
 # merging to QOF data from 21/22
-hse_qof_comp <- merge(hse_hyp_prev, Hyper21_22_cl, by.x = 'code', by.y = 'practice_code', all.y = TRUE)
+hse_qof_comp <- merge(hse_hyp_prev, Hyper21_22_cl, by.x = 'code', by.y = 'practice_code')
 
 # finding difference in crude prevalence 
 undiagnosed_hyp_prev <- hse_qof_comp %>%
@@ -1137,7 +1196,7 @@ undiagnosed_hyp_prev <- hse_qof_comp %>%
          practice_code = code)
 
 # finding absolute prevalence at GP level 
-abs_gp_hyper <- merge(undiagnosed_hyp_prev, GP_lsoa_data, by = 'practice_code', all.y = TRUE) %>%
+abs_gp_hyper <- merge(undiagnosed_hyp_prev, GP_lsoa_data, by = 'practice_code') %>%
   # selecting variables of interest 
   select(practice_code, practice_name, number_of_patients, hse_prevalence, prevalence_percent_21_22, undiagnosed_hyp,
          lsoa_code, lsoa_pop, sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
@@ -1150,9 +1209,11 @@ abs_gp_hyper <- merge(undiagnosed_hyp_prev, GP_lsoa_data, by = 'practice_code', 
 abs_undiagnosed_lsoa <- abs_gp_hyper %>%
   group_by(lsoa_code) %>%
   summarise(undiagnosed_prev = sum(gp_coverage*undiagnosed_hyp, na.rm = TRUE), 
+            hypertension_prev = sum(gp_coverage*prevalence_percent_21_22, na.rm = T),
             lsoa_pop = mean(lsoa_pop)) %>%
   mutate(undiagnosed = round(undiagnosed_prev*lsoa_pop/100), 
-         undiagnosed_v2 = round(0.1125633*lsoa_pop))
+         undiagnosed_v2 = round(0.1125633*lsoa_pop), 
+         hypertension_cases = round(hypertension_prev*lsoa_pop/100))
 
 abs_undiagnosed_lsoa_ccg <- merge(abs_undiagnosed_lsoa, lsoa_ccg_pop_merge, by = c('lsoa_code', 'lsoa_pop')) %>%
   select(-c(FID, LAD21CD, LAD21NM))
@@ -1164,7 +1225,24 @@ sub_icb_abs <- abs_gp_hyper %>%
   group_by(sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
   summarise(undiagnosed_hypertension = round(sum(undiagnosed_totals, na.rm = TRUE),digits = 0),
             undiagnosed_v2 = sum(undiagnosed_v2),
-            sub_icb_pop = sum(number_of_patients))
+            sub_icb_pop = sum(number_of_patients)) %>%
+  ungroup()
+
+top_decile_undiagnosed_ics <-  sub_icb_abs %>%
+  mutate(decile = ntile(undiagnosed_hypertension, 10)) %>%
+  filter(decile == 10)
+
+# plotting on a map 
+top_decile_undiagnosed_ics_shp <- merge(Eng_CCG, top_decile_undiagnosed_ics, by.x = 'CCG21CD', 
+                                        by.y = 'sub_icb_loc_ons_code')
+
+tm_shape(Eng_CCG) + 
+  tm_borders(col = "black") + 
+  tm_shape(top_decile_undiagnosed_ics_shp) + 
+  tm_fill(col = "#f7a600", alpha = 0.6) + 
+  tm_layout(main.title = "Top Decile of Undiagnosed Hypertension") + 
+  tm_compass(position = c("left", "top")) + 
+  tm_scale_bar(position = c("right", "bottom"))
 
 # Aggregating at Regional Level
 regional_abs_undiagnosed <- merge(sub_icb_abs, ccg_region, by.x = 'sub_icb_loc_ods_code', by.y = 'CCG21CDH') %>%
@@ -1547,7 +1625,21 @@ missed_21 <- QOF_prev_pop %>%
   select(., -c(year, covid)) %>%
   rename(obs_prev_21 = obsprev, 
          prev_diff_21 = prev_diff,
-         undiagnosed_21 = undiagnosed)
+         missed_21 = undiagnosed)
+
+top_decile_missed_ics <- missed_21 %>%
+  mutate(decile = ntile(missed_21, 10)) %>%
+  filter(decile == 1)
+
+top_decile_missed_ics_shp <- merge(Eng_CCG, top_decile_missed_ics, by = c('CCG21CD', 'CCG21NM'))
+
+tm_shape(Eng_CCG) + 
+  tm_borders(col = "black") + 
+  tm_shape(top_decile_missed_ics_shp) + 
+  tm_fill(col = "#00a3c7", alpha = 0.5) + 
+  tm_layout(main.title = "Top Decile of Missed Diagnoses") + 
+  tm_compass(position = c("left", "top")) + 
+  tm_scale_bar(position = c("right", "bottom"))
 
 missed_22 <- QOF_prev_pop %>%
   filter(year == 7) %>%
@@ -1632,13 +1724,38 @@ gp_uncontrolled_prev <- lsoa_hyper_prev %>%
 # Extrapolating these to LSOA level using the same methods as before 
 lsoa_uncontrolled_prev <- gp_uncontrolled_prev %>%
   group_by(lsoa_code) %>%
-  summarise(u79_achievement = under79_achievement_net_exceptions_21_22*gp_coverage, 
-            o80_achievement = over80_achievement_net_exceptions_21_22*gp_coverage, 
-            u79_intervention = under79_percent_receiving_intervention_21_22*gp_coverage, 
-            o80_intervention = over80_percent_receiving_intervention_21_22*gp_coverage,
-            weighted_achievement_rate = weighted_achievement_rate*gp_coverage, 
-            weighted_intervention_rate = weighted_intervention_rate*gp_coverage, 
-            lsoa_pop = mean(lsoa_pop))
+  summarise(u79_achievement = sum(under79_achievement_net_exceptions_21_22*gp_coverage), 
+            o80_achievement = sum(over80_achievement_net_exceptions_21_22*gp_coverage), 
+            u79_intervention = sum(under79_percent_receiving_intervention_21_22*gp_coverage), 
+            o80_intervention = sum(over80_percent_receiving_intervention_21_22*gp_coverage),
+            weighted_achievement_rate = sum(weighted_achievement_rate*gp_coverage), 
+            weighted_intervention_rate = sum(weighted_intervention_rate*gp_coverage), 
+            lsoa_pop = mean(lsoa_pop)) %>%
+  mutate(untreated_perc_under80 = 100 - u79_achievement, 
+         untreated_perc_over80 = 100 - o80_achievement, 
+         untreated_perc = 100 - weighted_achievement_rate, 
+         num_untreated_u80 = untreated_perc_under80*lsoa_pop/100, 
+         num_untreated_o80 = untreated_perc_over80*lsoa_pop/100, 
+         tot_untreated = untreated_perc*lsoa_pop/100, 
+         preventable_strokes = tot_untreated/67, 
+         preventable_mi = tot_untreated/118, 
+         total_costs_stroke_per_yr = (preventable_strokes/5)*(50850.72/5), 
+         total_costs_mi_per_yr = (preventable_mi/5)*1850.402,
+         hypertension_costs = (preventable_strokes/5)*161.67, 
+         costs_saved_stroke = total_costs_stroke_per_yr-hypertension_costs, 
+         costs_saved_mi = total_costs_mi_per_yr-hypertension_costs)
+
+lsoa_uncontrolled_imd <- merge(lsoa_uncontrolled_prev, LSOA_imd, by.x = "lsoa_code", by.y = "lsoa_code_2011") %>%
+  mutate(imd_decile = ntile(imd_score, 10)) %>%
+  mutate(across(imd_decile, as_factor)) %>%
+  group_by(imd_decile) %>%
+  summarise(u80_achievement = mean(u79_achievement), 
+            o80_achievement = mean(o80_achievement), 
+            achievement_rate = mean(weighted_achievement_rate), 
+            population = sum(lsoa_pop), 
+            tot_untreated = sum(tot_untreated),
+            costs_saved_stroke = sum(costs_saved_stroke), 
+            costs_saved_mi = sum(costs_saved_mi))
 
 # Finding the Impact on Undiagnosed Hypertension 
 undiagnosed_excess <- sub_icb_abs %>%
@@ -1656,7 +1773,12 @@ undiagnosed_excess <- sub_icb_abs %>%
          excess_mi80_LB = round(undiagnosed_hypertension*0.8/171), 
          excess_mi80_UB = round(undiagnosed_hypertension*0.8/94), 
          excess_stroke50 = round(undiagnosed_hypertension*0.5/67), 
-         excess_mi50 = round(undiagnosed_hypertension*0.5/118)) %>%
+         excess_mi50 = round(undiagnosed_hypertension*0.5/118), 
+         total_costs_stroke_per_yr = (excess_stroke/5)*(50850.72/5), 
+         total_costs_mi_per_yr = (excess_mi/5)*1850.402,
+         hypertension_costs = (excess_stroke/5)*161.67, 
+         costs_saved_stroke = total_costs_stroke_per_yr-hypertension_costs, 
+         costs_saved_mi = total_costs_mi_per_yr-hypertension_costs) %>%
   drop_na()
 
 regional_undiagnosed_excess <- regional_abs_undiagnosed %>%
@@ -1674,7 +1796,12 @@ sub_icb_missed_excess <- missed_all %>%
          excess_stroke_UB = floor(undiagnosed_22/57), 
          excess_mi = floor(undiagnosed_22/118),
          excess_mi_LB = floor(undiagnosed_22/171), 
-         excess_mi_UB = floor(undiagnosed_22/94), 
+         excess_mi_UB = floor(undiagnosed_22/94),
+         total_costs_stroke_per_yr = (excess_stroke/5)*(50850.72/5), 
+         total_costs_mi_per_yr = (excess_mi/5)*1850.402,
+         hypertension_costs = (excess_stroke/5)*161.67, 
+         costs_saved_stroke = total_costs_stroke_per_yr-hypertension_costs, 
+         costs_saved_mi = total_costs_mi_per_yr-hypertension_costs,
          missed_diagnoses_per_100000 = round(undiagnosed_22/(sub_icb_pop/100000), digits = 2)) %>%
 #  select(-c(obs_prev_21:age_std_prev_22)) %>%
   rename(missed_diagnoses = undiagnosed_22, 
@@ -1781,21 +1908,57 @@ decile_cumulative <- lsoa_undiagnosed %>%
          excess_mi_v2 = floor(undiagnosed_hse_crude/118),
          undiagnosed_per_100000 = round(undiagnosed/(population/100000), digits = 2))
 
-undiagnosed_decile <- lsoa_undiagnosed %>%
+undiagnosed_decile <- abs_undiagnosed_lsoa %>%
   dplyr::mutate(ntile = ntile(undiagnosed, 5)) %>%
   mutate(across(ntile, as_factor))
+
 
 undiagnosed_decile_grouped <- undiagnosed_decile %>%
   dplyr::group_by(ntile) %>%
   summarise(undiagnosed = sum(undiagnosed), 
             population = sum(lsoa_pop)) %>%
   mutate(excess_stroke = floor(undiagnosed/67), 
-         excess_mi = floor(undiagnosed/118))
+         excess_mi = floor(undiagnosed/118), 
+         total_costs_stroke_per_yr = round((excess_stroke/5)*(50850.72/5)), 
+         total_costs_mi_per_yr = round((excess_mi/5)*1850.402),
+         hypertension_costs = round((excess_stroke/5)*161.67), 
+         costs_saved_stroke = total_costs_stroke_per_yr-hypertension_costs, 
+         costs_saved_mi = total_costs_mi_per_yr-hypertension_costs)
 
-decile_cumulative_long <- decile_cumulative%>%
+decile_cumulative_long <- decile_cumulative %>%
   pivot_longer(cols = c('undiagnosed', 'hypertension_pop'), 
                names_to = 'population_type', 
                values_to = 'occurances')
+
+missed_quintile <- sub_icb_missed_excess %>%
+  mutate(quintile = ntile(desc(missed_diagnoses), 5)) %>%
+  mutate(across(quintile, as_factor))
+
+missed_quintile_grouped <- missed_quintile %>%
+  group_by(quintile) %>%
+  summarise(missed_diagnoses = sum(missed_diagnoses)*-1,
+            missed_diagnoses_per_100000 = sum(missed_diagnoses_per_100000),
+            population = sum(sub_icb_pop), 
+            excess_stroke = sum(excess_stroke)*-1, 
+            excess_mi = sum(excess_mi)*-1)
+
+missed_quintile_grouped$excess_stroke[missed_quintile_grouped$quintile==1] <- 0
+missed_quintile_grouped$excess_mi[missed_quintile_grouped$quintile==1] <- 0
+missed_quintile_grouped$missed_diagnoses[missed_quintile_grouped$quintile==1] <- 0
+
+lsoa_hypertension_imd_decile <- merge(abs_undiagnosed_lsoa, LSOA_imd, by.x = 'lsoa_code', by.y = 'lsoa_code_2011') %>%
+  mutate(imd_decile = ntile(imd_score, 10)) %>%
+  mutate(across(imd_decile, as_factor)) %>%
+  group_by(imd_decile) %>%
+  summarise(undiagnosed = sum(undiagnosed), 
+            population = sum(lsoa_pop),
+            hypertension_pop = sum(hypertension_cases)) %>%
+  mutate(excess_stroke = floor(undiagnosed/67),
+         excess_mi = floor(undiagnosed/118), 
+         undiagnosed_per_100000 = round(undiagnosed/(population/100000), digits = 2))
+
+
+##
 
 ggplot(decile_cumulative, aes(x = obs_decile, y = excess_stroke)) +
   stat_pareto(point.color = "red", 
@@ -1850,6 +2013,29 @@ ggplot(decile_cumulative_long, aes(x = obs_decile, y = occurances/1000,
   geom_col() +
   labs(title = "Hypertension Distribution by Decile", x = "Hypertension Prevalence Decile", 
        y = "Hypertension Population (in 1000s)") 
+
+
+ggplot(lsoa_hypertension_imd_decile, aes(x = imd_decile, fill = imd_decile)) +
+  scale_fill_brewer(palette = "RdBu", direction = -1) + 
+  geom_col(aes(y = hypertension_pop/1000)) +
+  geom_point(aes(y = undiagnosed/1000), size = 3) +
+  geom_path(aes(y = undiagnosed/1000, group = 1)) +
+  labs(title = "Hypertension Population Distribution", x = "IMD Decile (10 is Most Deprived)", 
+       y = "Hypertension Population (in 1000s)") +
+  geom_text(aes(5, 725, label = 'Undiagnosed Population', vjust = -1.5, hjust = 0.25)) +
+  scale_y_continuous(sec.axis = sec_axis(~., name = "Undiagnosed Population (in 1000s)")) +
+  theme(legend.position =  "none")
+
+ggplot(lsoa_uncontrolled_imd, aes(x = imd_decile, fill = imd_decile)) +
+  scale_fill_brewer(palette = "RdBu", direction = -1) + 
+  geom_col(aes(y = tot_untreated/1000)) +
+#  geom_point(aes(y = tot_untreated/1000), size = 3) +
+#  geom_path(aes(y = tot_untreated/1000, group = 1)) +
+  labs(title = "Uncontrolled Hypertension Population", x = "IMD Decile (10 is Most Deprived)", 
+       y = "Uncontrolled Population (in 1000s)") +
+#  geom_text(aes(1, 750, label = 'Undiagnosed Population', vjust = -1.5, hjust = 0.25)) +
+#  scale_y_continuous(sec.axis = sec_axis(~., name = "Untreated Population (in 1000s)")) +
+  theme(legend.position =  "none")
 
 
 # Done by Region
@@ -2053,7 +2239,6 @@ ggplot(south_west_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_
        x = "Undiagnosed Quintile", 
        y = "Preventable Cases of Stroke")
 
-
 #### Waterfall Plots - Excess Strokes ####
 waterfall(values = undiagnosed_decile_grouped$excess_stroke, 
           labels = undiagnosed_decile_grouped$ntile, calc_total = T,
@@ -2152,6 +2337,36 @@ waterfall(values = south_west_undiagnosed_grouped$excess_stroke,
   scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
                               "Quintile 5", "Total"))
 
+# Waterfall for Missed Diagnoses only 
+waterfall(values = missed_quintile_grouped$excess_stroke, 
+          labels = missed_quintile_grouped$quintile, calc_total = T,
+          total_rect_color = "#002f5f",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#dcfffd", "#c3f0fa", "#ade1f6", "#95d1f2", "#8bbee0")) +
+  theme_minimal() +
+  labs(title = "Excess Stroke in England", 
+       x = "Missed Hypertension Diagnoses Quintile", 
+       y = "Excess Strokes") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+# For Cost 
+waterfall(values = round(undiagnosed_decile_grouped$total_costs_stroke_per_yr/1000000, digits = 1), 
+          labels = undiagnosed_decile_grouped$ntile, calc_total = T,
+          total_rect_color = "#002f5f",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#dcfffd", "#c3f0fa", "#ade1f6", "#95d1f2", "#8bbee0"), 
+          rect_text_size = 2) +
+  theme_minimal() +
+  labs(title = "Costs of Excess Strokes in England", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Total Costs of Excess Strokes (£M)") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total")) +
+  scale_y_continuous(labels = function(y) format(y, scientific = FALSE))
+
+
+
 #### Waterfall Plots - Excess MI ####
 waterfall(values = undiagnosed_decile_grouped$excess_mi, 
           labels = undiagnosed_decile_grouped$ntile, calc_total = T,
@@ -2249,6 +2464,38 @@ waterfall(values = south_west_undiagnosed_grouped$excess_mi,
        y = "Excess MIs") +
   scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
                               "Quintile 5", "Total"))
+
+
+# For Missed 
+waterfall(values = missed_quintile_grouped$excess_mi, 
+          labels = missed_quintile_grouped$quintile, calc_total = T,
+          total_rect_color = "#840034",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#fde5e2", "#fbcdca", "#f9b6b5", "#f6a0a0", "#b9787f")) +
+  theme_minimal() +
+  labs(title = "Excess MI in the England", 
+       x = "Missed Hypertension Diagnoses Quintile", 
+       y = "Excess MI") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total"))
+
+
+# For Cost 
+waterfall(values = round(undiagnosed_decile_grouped$total_costs_mi_per_yr/1000000, digits = 1), 
+          labels = undiagnosed_decile_grouped$ntile, calc_total = T,
+          total_rect_color = "#840034",
+          fill_by_sign = FALSE, 
+          fill_colours = c("#fde5e2", "#fbcdca", "#f9b6b5", "#f6a0a0", "#b9787f"), 
+          rect_text_size = 2) +
+  theme_minimal() +
+  labs(title = "Costs of Excess MI in England", 
+       x = "Undiagnosed Hypertension Quintile", 
+       y = "Total Costs of Excess MI (£M)") +
+  scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
+                              "Quintile 5", "Total")) +
+  scale_y_continuous(labels = function(y) format(y, scientific = FALSE))
+
+
 
 #### Mapping ####
 # mapping where the events are
