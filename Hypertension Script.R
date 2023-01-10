@@ -384,6 +384,10 @@ tm_shape(hyper_prev_shp) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Hypertension Rates vs Expected', legend.outside = TRUE, legend.text.size = 2) 
 
+# removing Ealing
+hyper_prev_no_ealing <- hyper_prev_shp %>%
+  filter(!grepl('Ealing', name))
+
 # Plot at CCG Level 
 ccg_shp <- merge(Eng_CCG, ccg_region, by = c('CCG21CD', 'CCG21NM'))
 lsoa_ccg_shp <- merge(ENG_LSOA11, ccg_grouped, by.x = 'geo_code', by.y = 'lsoa_code')
@@ -1690,35 +1694,23 @@ lsoa_uncontrolled_prev <- lsoa_hyper_prev %>%
          untreated_perc_over80 = 100 - treated_over80_percent_lsoa, 
          needed_for_80_treat = 80 - all_treated_percent_lsoa,
          untreated_perc = 100 - all_treated_percent_lsoa, 
-         num_untreated_u80 = untreated_perc_under80*(lsoa_pop*(hypertension_prev/100))/100, 
-         num_untreated_o80 = untreated_perc_over80*(lsoa_pop*(hypertension_prev/100))/100,
          untreated_80percent = needed_for_80_treat*(lsoa_pop*(hypertension_prev/100))/100,
          tot_untreated = untreated_perc*(lsoa_pop*hypertension_prev/100)/100, 
          preventable_strokes = floor(tot_untreated/67), 
-         preventable_strokes80 = untreated_80percent/67,
-         preventable_mi = floor(tot_untreated/118), 
-         preventable_mi80 = untreated_80percent/118,
-         total_costs_stroke_per_yr = (preventable_strokes)*(50850.72/5), 
-         total_costs_mi_per_yr = (preventable_mi)*2052.12,
-         hypertension_costs = (preventable_strokes)*161.67, 
-         costs_saved_stroke = round(total_costs_stroke_per_yr-hypertension_costs,2), 
-         costs_saved_mi = round(total_costs_mi_per_yr-hypertension_costs, 2),
-         total_costs_stroke80_per_yr = (preventable_strokes80)*(50850.72/5), 
-         total_costs_mi80_per_yr = (preventable_mi80)*2052.12,
-         hypertension_costs80 = (preventable_strokes80)*161.67, 
-         costs_saved_stroke80 = total_costs_stroke80_per_yr-hypertension_costs80, 
-         costs_saved_mi80 = total_costs_mi80_per_yr-hypertension_costs80)
+         preventable_mi = floor(tot_untreated/118))
 
-lsoa_uncontrolled_quintile80 <- lsoa_uncontrolled_prev %>%
-  mutate(uncontrolled_quintile = ntile(needed_for_80_treat, 5)) %>%
+lsoa_uncontrolled_quintile <- lsoa_uncontrolled_prev %>%
+  mutate(uncontrolled_quintile = ntile(untreated_perc, 5)) %>%
   mutate(across(uncontrolled_quintile, as_factor))%>%
   group_by(uncontrolled_quintile) %>%
   summarise(population = sum(lsoa_pop),
-            untreated_pop80 = sum(untreated_80percent),
-            prevented_strokes80 = sum(preventable_strokes80),
-            prevented_mi80 = sum(preventable_mi80), 
-            costs_saved_from_prevented_strokes80 = sum(costs_saved_stroke80), 
-            costs_saved_from_prevented_mi80 = sum(costs_saved_mi80))
+            tot_untreated = sum(tot_untreated)) %>%
+  mutate(preventable_strokes = floor(tot_untreated/67), 
+         preventable_mi = floor(tot_untreated/118), 
+         total_costs_stroke_per_yr = (preventable_strokes)*(50850.72/5), 
+         total_costs_mi_per_yr = (preventable_mi)*2052.12,
+         hypertension_costs = (tot_untreated)*161.67, 
+         costs_saved = round(total_costs_stroke_per_yr+total_costs_mi_per_yr-hypertension_costs, 2))
 
 lsoa_uncontrolled_imd <- merge(lsoa_uncontrolled_prev, LSOA_imd, by.x = "lsoa_code", by.y = "lsoa_code_2011") %>%
   mutate(imd_decile = ntile(imd_score, 10)) %>%
@@ -1726,12 +1718,14 @@ lsoa_uncontrolled_imd <- merge(lsoa_uncontrolled_prev, LSOA_imd, by.x = "lsoa_co
   group_by(imd_decile) %>%
   summarise(achievement_rate = mean(all_treated_percent_lsoa), 
             population = sum(lsoa_pop), 
-            tot_untreated = sum(tot_untreated),
-            untreated_pop80 = sum(untreated_80percent),
-            costs_saved_stroke = sum(costs_saved_stroke), 
-            costs_saved_mi = sum(costs_saved_mi),
-            costs_saved_from_prevented_strokes80 = sum(costs_saved_stroke80), 
-            costs_saved_from_prevented_mi80 = sum(costs_saved_mi80))
+            tot_untreated = sum(tot_untreated)) %>%
+  mutate(preventable_strokes = floor(tot_untreated/67), 
+         preventable_mi = floor(tot_untreated/118),
+         total_costs_stroke_per_yr = (preventable_strokes)*(50850.72/5), 
+         total_costs_mi_per_yr = (preventable_mi)*2052.12,
+         hypertension_costs = (tot_untreated)*161.67, 
+         costs_saved = round(total_costs_stroke_per_yr+total_costs_mi_per_yr-hypertension_costs, 2))
+  
 
 # Finding the Impact on Undiagnosed Hypertension 
 undiagnosed_excess <- sub_icb_abs %>%
@@ -1752,9 +1746,8 @@ undiagnosed_excess <- sub_icb_abs %>%
          excess_mi50 = round(undiagnosed_hypertension*0.5/118), 
          total_costs_stroke_per_yr = (excess_stroke)*(50850.72/5), 
          total_costs_mi_per_yr = (excess_mi)*2052.12,
-         hypertension_costs = (excess_stroke)*161.67, 
-         costs_saved_stroke = total_costs_stroke_per_yr-hypertension_costs, 
-         costs_saved_mi = total_costs_mi_per_yr-hypertension_costs) %>%
+         hypertension_costs = (undiagnosed_hypertension)*161.67, 
+         costs_saved = total_costs_stroke_per_yr+total_costs_mi_per_yr-hypertension_costs) %>%
   drop_na()
 
 regional_undiagnosed_excess <- regional_abs_undiagnosed %>%
@@ -1775,9 +1768,8 @@ sub_icb_missed_excess <- missed_all %>%
          excess_mi_UB = floor(undiagnosed_22/94),
          total_costs_stroke_per_yr = (excess_stroke)*(50850.72/5), 
          total_costs_mi_per_yr = (excess_mi)*2052.12,
-         hypertension_costs = (excess_stroke)*161.67, 
-         costs_saved_stroke = total_costs_stroke_per_yr-hypertension_costs, 
-         costs_saved_mi = total_costs_mi_per_yr-hypertension_costs,
+         hypertension_costs = (undiagnosed_22)*161.67, 
+         costs_saved_stroke = total_costs_stroke_per_yr+total_costs_mi_per_yr-hypertension_costs,
          missed_diagnoses_per_100000 = round(undiagnosed_22/(sub_icb_pop/100000), digits = 2)) %>%
 #  select(-c(obs_prev_21:age_std_prev_22)) %>%
   rename(missed_diagnoses = undiagnosed_22, 
@@ -1910,13 +1902,16 @@ undiagnosed_decile_grouped <- undiagnosed_decile %>%
   dplyr::group_by(ntile) %>%
   summarise(undiagnosed = sum(undiagnosed), 
             population = sum(lsoa_pop)) %>%
-  mutate(excess_stroke = floor(undiagnosed/67), 
+  mutate(excess_stroke = floor(undiagnosed/67),
+         stroke_LB = floor(undiagnosed/84), 
+         stroke_UB = floor(undiagnosed/57), 
          excess_mi = floor(undiagnosed/118), 
+         mi_LB = floor(undiagnosed/171), 
+         mi_UB = floor(undiagnosed/94),
          total_costs_stroke_per_yr = round((excess_stroke)*(50850.72/5)), 
          total_costs_mi_per_yr = round((excess_mi)*2052.12),
-         hypertension_costs = round((excess_stroke)*161.67), 
-         costs_saved_stroke = total_costs_stroke_per_yr-hypertension_costs, 
-         costs_saved_mi = total_costs_mi_per_yr-hypertension_costs)
+         hypertension_costs = round((undiagnosed)*161.67), 
+         costs_saved = total_costs_stroke_per_yr + total_costs_mi_per_yr -hypertension_costs) 
 
 decile_cumulative_long <- decile_cumulative %>%
   pivot_longer(cols = c('undiagnosed', 'hypertension_pop'), 
@@ -1933,7 +1928,11 @@ missed_quintile_grouped <- missed_quintile %>%
             missed_diagnoses_per_100000 = sum(missed_diagnoses_per_100000),
             population = sum(sub_icb_pop), 
             excess_stroke = sum(excess_stroke)*-1, 
-            excess_mi = sum(excess_mi)*-1)
+            excess_mi = sum(excess_mi)*-1,
+            stroke_LB = sum(excess_stroke_LB)*-1, 
+            stroke_UB = sum(excess_stroke_UB)*-1,
+            mi_LB = sum(excess_mi_LB)*-1, 
+            mi_UB = sum(excess_mi_UB)*-1)
 
 missed_quintile_grouped$excess_stroke[missed_quintile_grouped$quintile==1] <- 0
 missed_quintile_grouped$excess_mi[missed_quintile_grouped$quintile==1] <- 0
@@ -2103,23 +2102,23 @@ ggplot(undiagnosed_excess_mi, aes(x = sub_icb_loc_name)) +
        x = 'ICS', y = 'Prevented Cases of MI')
 
 #### Costs Pareto Charts ####
-preventable_stroke_costs <- lsoa_uncontrolled_quintile80[order(lsoa_uncontrolled_quintile80$uncontrolled_quintile, 
+preventable_events_costs <- lsoa_uncontrolled_quintile[order(lsoa_uncontrolled_quintile$uncontrolled_quintile, 
                                                       decreasing = T), ]
 
-preventable_stroke_costs$uncontrolled_quintile <- factor(preventable_stroke_costs$uncontrolled_quintile, 
-                                                     levels = preventable_stroke_costs$uncontrolled_quintile)
+preventable_events_costs$uncontrolled_quintile <- factor(preventable_events_costs$uncontrolled_quintile, 
+                                                     levels = preventable_events_costs$uncontrolled_quintile)
 # Creating Cumulative Sum of Costs Saved
-preventable_stroke_costs$cumulative <- cumsum(preventable_stroke_costs$costs_saved_from_prevented_strokes80) 
+preventable_events_costs$cumulative <- cumsum(preventable_events_costs$costs_saved) 
 # Converting Cumulative Sum to a Percentage
-preventable_stroke_costs$cumulative <- 100 * preventable_stroke_costs$cumulative/tail(preventable_stroke_costs$cumulative, n = 1)
+preventable_events_costs$cumulative <- 100 * preventable_events_costs$cumulative/tail(preventable_events_costs$cumulative, n = 1)
 # Adjusting Right Hand Scale
-scaleRight_Strokecosts <- tail(preventable_stroke_costs$cumulative, n = 1)/head(preventable_stroke_costs$costs_saved_from_prevented_strokes80, n = 1)
+scaleRight_costs <- tail(preventable_events_costs$cumulative, n = 1)/head(preventable_events_costs$costs_saved, n = 1)
 
-ggplot(preventable_stroke_costs, aes(x = uncontrolled_quintile)) +
-  geom_bar(aes(y = costs_saved_from_prevented_strokes80/1000000), fill = "#00a3c7", stat = "identity") + 
-  geom_path(aes(y = cumulative/scaleRight_Strokecosts/1000000, group = 1), color = "black", lwd = 2.5) + 
-  geom_point(aes(y = cumulative/scaleRight_Strokecosts/1000000, group = 1), color = 'black', size = 5) + 
-  scale_y_continuous(breaks = c(0,10,20,30,40,50,60,70), sec.axis = sec_axis(~.*scaleRight_Strokecosts*1000000, name = "Cumulative (%)")) +
+ggplot(preventable_events_costs, aes(x = uncontrolled_quintile)) +
+  geom_bar(aes(y = costs_saved/1000000), fill = "#00a3c7", stat = "identity") + 
+  geom_path(aes(y = cumulative/scaleRight_costs/1000000, group = 1), color = "black", lwd = 2.5) + 
+  geom_point(aes(y = cumulative/scaleRight_costs/1000000, group = 1), color = 'black', size = 5) + 
+  scale_y_continuous(sec.axis = sec_axis(~.*scaleRight_costs*1000000, name = "Cumulative (%)")) +
   theme(axis.text.x = element_text(vjust = 0.5)) +
   labs(x = 'Uncontrolled Hypertension Quintile (5 is Most Uncontrolled)', y = 'Costs (in Millions £)') + 
   theme(panel.background = element_blank(), 
@@ -2154,23 +2153,22 @@ ggplot(preventable_mi_costs, aes(x = uncontrolled_quintile)) +
         axis.text = element_text(size = 16), 
         axis.title = element_text(size = 24))
 # IMD
-imd_stroke_costs <- lsoa_uncontrolled_imd[order(lsoa_uncontrolled_imd$imd_decile, 
+imd_costs <- lsoa_uncontrolled_imd[order(lsoa_uncontrolled_imd$imd_decile, 
                                                                decreasing = T), ]
 
-imd_stroke_costs$imd_decile <- factor(imd_stroke_costs$imd_decile, 
-                                                         levels = imd_stroke_costs$imd_decile)
+imd_costs$imd_decile <- factor(imd_costs$imd_decile,levels = imd_costs$imd_decile)
 # Creating Cumulative Sum of Costs Saved
-imd_stroke_costs$cumulative <- cumsum(imd_stroke_costs$costs_saved_from_prevented_strokes80) 
+imd_costs$cumulative <- cumsum(imd_costs$costs_saved) 
 # Converting Cumulative Sum to a Percentage
-imd_stroke_costs$cumulative <- 100 * imd_stroke_costs$cumulative/tail(imd_stroke_costs$cumulative, n = 1)
+imd_costs$cumulative <- 100 * imd_costs$cumulative/tail(imd_costs$cumulative, n = 1)
 # Adjusting Right Hand Scale
-scaleRight_StrokeIMDcosts <- tail(imd_stroke_costs$cumulative, n = 1)/head(imd_stroke_costs$costs_saved_from_prevented_strokes80, n = 1)
+scaleRight_IMDcosts <- tail(imd_costs$cumulative, n = 1)/head(imd_costs$costs_saved, n = 1)
 
-ggplot(imd_stroke_costs, aes(x = imd_decile)) +
-  geom_bar(aes(y = costs_saved_from_prevented_strokes80/1000000), fill = "#002f5f", stat = "identity") + 
-  geom_path(aes(y = cumulative/scaleRight_StrokeIMDcosts/1000000, group = 1), color = "black", lwd = 3) + 
-  geom_point(aes(y = cumulative/scaleRight_StrokeIMDcosts/1000000, group = 1), color = 'black', size = 5) + 
-  scale_y_continuous(sec.axis = sec_axis(~.*scaleRight_StrokeIMDcosts*1000000, name = "Cumulative (%)")) +
+ggplot(imd_costs, aes(x = imd_decile)) +
+  geom_bar(aes(y = costs_saved/1000), fill = "#002f5f", stat = "identity") + 
+  geom_path(aes(y = cumulative/scaleRight_IMDcosts/1000, group = 1), color = "black", lwd = 3) + 
+  geom_point(aes(y = cumulative/scaleRight_IMDcosts/1000, group = 1), color = 'black', size = 5) + 
+  scale_y_continuous(sec.axis = sec_axis(~.*scaleRight_IMDcosts*1000, name = "Cumulative (%)")) +
   theme(axis.text.x = element_text(vjust = 0.5),
         panel.background = element_blank(), 
         panel.grid.major =  element_blank(), 
@@ -2178,7 +2176,7 @@ ggplot(imd_stroke_costs, aes(x = imd_decile)) +
         axis.text = element_text(size = 16), 
         axis.title = element_text(size = 24)) +
   labs(title = 'Costs of Strokes Resulting from Uncontrolled Hypertension', 
-       x = 'IMD Decile (10 is Most Deprived)', y = 'Costs (in Millions £)') + 
+       x = 'IMD Decile (10 is Most Deprived)', y = 'Costs (in Thousands £)') + 
   theme(panel.background = element_blank(), 
         panel.grid.major =  element_blank(), 
         axis.line = element_line(colour = "black"))
@@ -2397,13 +2395,14 @@ ggplot(south_west_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_
        x = "Undiagnosed Quintile", 
        y = "Preventable Cases of Stroke")
 
-x#### Waterfall Plots - Excess Strokes ####
+#### Waterfall Plots - Excess Strokes ####
 waterfall(values = undiagnosed_decile_grouped$excess_stroke, 
           labels = undiagnosed_decile_grouped$ntile, calc_total = T,
           total_rect_color = "#002f5f",
           fill_by_sign = FALSE, 
           fill_colours = c("#dcfffd", "#c3f0fa", "#ade1f6", "#95d1f2", "#8bbee0"),
           rect_text_size = 2) +
+  geom_errorbar(aes(ymin = stroke_LB, ymax = stroke_UB), width = .2, position = position_dodge(1)) +
   theme(axis.text = element_text(size = 16), 
         axis.title = element_text(size = 24),
         panel.background = element_blank(), 
@@ -2726,29 +2725,26 @@ waterfall(values = round(undiagnosed_decile_grouped$total_costs_mi_per_yr/100000
   scale_y_continuous(labels = function(y) format(y, scientific = FALSE))
 
 ###
-ics_treatment_data_total <- ics_treatment_data %>%
-  mutate(total_costs = costs_saved_from_prevented_stroke + costs_saved_from_prevented_mi) 
-
-ics_total_costs <- ics_treatment_data_total[order(ics_treatment_data_total$total_costs,
+ics_total_costs <- ics_treatment_data[order(ics_treatment_data$costs_saved,
                                                            decreasing = T), ]
 
 ics_total_costs$SICBL22NM <- factor(ics_total_costs$SICBL22NM, 
                                         levels = ics_total_costs$SICBL22NM)
 # Creating Cumulative Sum of Costs Saved
-ics_total_costs$cumulative <- cumsum(ics_total_costs$total_costs) 
+ics_total_costs$cumulative <- cumsum(ics_total_costs$costs_saved) 
 # Converting Cumulative Sum to a Percentage
 ics_total_costs$cumulative <- 100 * ics_total_costs$cumulative/tail(ics_total_costs$cumulative, n = 1)
 # Adjusting Right Hand Scale
-scaleRight_Totalcosts <- tail(ics_total_costs$cumulative, n = 1)/head(ics_total_costs$total_costs, n = 1)
+scaleRight_Totalcosts <- tail(ics_total_costs$cumulative, n = 1)/head(ics_total_costs$costs_saved, n = 1)
 
 ggplot(ics_total_costs, aes(x = SICBL22NM)) +
-  geom_bar(aes(y = total_costs/1000000), fill = "#00a3c7", stat = "identity") + 
-  geom_path(aes(y = cumulative/scaleRight_Totalcosts/1000000, group = 1), color = "red") + 
-  geom_point(aes(y = cumulative/scaleRight_Totalcosts/1000000, group = 1), color = 'black') + 
-  scale_y_continuous(sec.axis = sec_axis(~.*scaleRight_Totalcosts*1000000, name = "Cumulative (%)")) +
+  geom_bar(aes(y = costs_saved/1000), fill = "#00a3c7", stat = "identity") + 
+  geom_path(aes(y = cumulative/scaleRight_Totalcosts/1000, group = 1), color = "red") + 
+  geom_point(aes(y = cumulative/scaleRight_Totalcosts/1000, group = 1), color = 'black') + 
+  scale_y_continuous(sec.axis = sec_axis(~.*scaleRight_Totalcosts*1000, name = "Cumulative (%)")) +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
   labs(title = 'Costs Resulting from Uncontrolled Hypertension by ICS', 
-       x = 'ICS', y = 'Costs (in Millions £)') + 
+       x = 'ICS', y = 'Costs (in Thousands £)') + 
   theme(panel.background = element_blank(), 
         panel.grid.major =  element_blank(), 
         axis.line = element_line(colour = "black"))
@@ -2881,54 +2877,40 @@ lsoa_hypertension_data <- merge(lsoa_age_adj, lsoa_undiagnosed_imd, by = c('lsoa
          SICBL22CDH = CCG21CDH, 
          SICBL22CD = CCG21CD) %>%
   mutate(excess_stroke = floor(number_undiagnosed/67), 
-         excess_mi = floor(number_undiagnosed/118),
-         total_costs_excess_stroke_per_yr = (excess_stroke/5)*(50850.72/5), 
-         total_costs_excess_mi_per_yr = (excess_mi/5)*1850.402,
-         hypertension_costs = (excess_stroke/5)*161.67, 
-         costs_saved_from_excess_stroke = total_costs_excess_stroke_per_yr-hypertension_costs, 
-         costs_saved_from_excess_mi = total_costs_excess_mi_per_yr-hypertension_costs)
+         excess_mi = floor(number_undiagnosed/118))
 
 lsoa_treatment_data <- merge(lsoa_uncontrolled_prev, lsoa_region, by.x = "lsoa_code", by.y = "LSOA11CD") %>%
-  select(-c(untreated_perc_under80:untreated_80percent, preventable_strokes80, preventable_mi80:hypertension_costs,
-            total_costs_stroke80_per_yr:costs_saved_mi80, tot_untreated, FID)) %>%
+  select(-c(untreated_perc_under80:needed_for_80_treat, untreated_80percent, FID)) %>%
   rename(LSOA11CD = lsoa_code, 
          SICBL22NM = CCG21NM, 
          SICBL22CDH = CCG21CDH, 
          SICBL22CD = CCG21CD, 
-         costs_saved_from_prevented_stroke = costs_saved_stroke, 
-         costs_saved_from_prevented_mi = costs_saved_mi, 
          observed_hypertension_prevalence = hypertension_prev, 
          over80_treatment_rate = treated_over80_percent_lsoa, 
          under80_treatment_rate = treated_under80_percent_lsoa, 
          overall_treatment_rate = all_treated_percent_lsoa)
 
-lsoa_hypertension_plus_treatment <- inner_join(lsoa_hypertension_data, lsoa_treatment_data) %>%
-  select(-c(total_costs_excess_stroke_per_yr:hypertension_costs)) 
-
-lsoa_hypertension_data <- lsoa_hypertension_data[,c(1,10,3,4,8,2,9,15,16,20,21,13,14,5:7,11,12)]
+lsoa_hypertension_data <- lsoa_hypertension_data[,c(1,10,3,4,2,8,9,15,16,13,14,5:7,11,12)]
 lsoa_treatment_data <- lsoa_treatment_data[,c(1,11,2,3,5,4,6:10,12:16)]
-lsoa_hypertension_plus_treatment <- lsoa_hypertension_plus_treatment[,c(1,10,3,4,8,2,9,13:23,5:7,11,12)]
 
 ics_treatment_data <- lsoa_treatment_data %>%
   group_by(SICBL22CD, SICBL22CDH, SICBL22NM) %>%
-  summarise(sub_icb_pop = sum(lsoa_pop), 
+  summarise(sub_icb_pop = sum(lsoa_pop),
+            tot_untreated = sum(tot_untreated),
             observed_hypertension_prev = mean(observed_hypertension_prevalence),
             under80_treatment_rate = mean(under80_treatment_rate), 
             over80_treatment_rate = mean(over80_treatment_rate), 
-            overall_treatment_rate = mean(overall_treatment_rate), 
-            preventable_strokes = sum(preventable_strokes), 
-            preventable_mi = sum(preventable_mi), 
-            costs_saved_from_prevented_stroke = sum(costs_saved_from_prevented_stroke), 
-            costs_saved_from_prevented_mi = sum(costs_saved_from_prevented_mi), 
+            overall_treatment_rate = mean(overall_treatment_rate),
             NHSER21NM = paste(unique(NHSER21NM)), 
             NHSER21CD = paste(unique(NHSER21CD))) %>%
-  mutate(cost_stroke_nhs_pyr=(preventable_strokes)*(20158.39/5), # to use this mutate for plots
-         cost_stroke_social_pyr=(preventable_strokes)*(30692.33/5),
-         cost_htn_pyr=(preventable_strokes)*(161.67),
-         cost_saved_nhs_from_prevented_stroke = cost_stroke_nhs_pyr-cost_htn_pyr,
-         cost_saved_social_from_prevented_stroke =cost_stroke_social_pyr)
+  mutate(preventable_strokes = floor(tot_untreated/67), 
+         preventable_mi = floor(tot_untreated/118), 
+         total_costs_excess_stroke_per_yr = (preventable_strokes)*(50850.72/5), 
+         total_costs_excess_mi_per_yr = (preventable_mi)*2052.12,
+         hypertension_costs = (tot_untreated)*161.67, 
+         costs_saved = total_costs_excess_stroke_per_yr+total_costs_excess_mi_per_yr-hypertension_costs)
 
-ics_treatment_data <- ics_treatment_data[,c(1,3,2,4:10,18,19,11:14)]
+ics_treatment_data <- ics_treatment_data[,c(1,3,2,4:9,12,13,17,10,11)]
 
 sub_icb_data <- left_join(sub_icb_abs, undiagnosed_excess)
 ccg_data <- left_join(ccg_agg, missed_21)
@@ -2939,7 +2921,7 @@ ics_imd <- ics_imd %>%
 
 ics_hypertension_data <- merge(ccg_data, sub_icb_data, by.x = c("CCG21CDH", "CCG21CD"), 
                                by.y = c("sub_icb_loc_ods_code", "sub_icb_loc_ons_code")) %>%
-  select(-c(CCG21NM, avg_prevalence_21_22:obs_over_exp_22, avg_u79_achievement_21_22:ccg_code, prev_diff_21, 
+  select(-c(CCG21NM:obs_over_exp_22, avg_u79_achievement_21_22:ccg_code, prev_diff_21, 
             excess_stroke_LB, excess_stroke_UB, excess_mi_LB, excses_mi_UB, excess_stroke80:excess_mi50, 
             sub_icb_pop.y, lsoa_pop_21_22, predicted_prev)) %>%
   rename(SICBL22CDH = CCG21CDH, 
@@ -2954,34 +2936,27 @@ ics_hypertension_data <- merge(ccg_data, sub_icb_data, by.x = c("CCG21CDH", "CCG
   mutate(missed_diagnoses = missed_diagnoses*(-1),
          undiagnosed_rate = round(undiagnosed_rate_per_100000/1000, 2),
          missed_strokes = floor(missed_diagnoses/67), 
-         missed_mi = floor(missed_diagnoses/118),
-         total_costs_excess_stroke_per_yr = (excess_stroke)*(50850.72/5), 
-         total_costs_excess_mi_per_yr = (excess_mi)*2052.12,
-         hypertension_costs = (excess_stroke)*161.67, 
-         costs_saved_from_excess_stroke = total_costs_excess_stroke_per_yr-hypertension_costs, 
-         costs_saved_from_excess_mi = total_costs_excess_mi_per_yr-hypertension_costs) %>%
+         missed_mi = floor(missed_diagnoses/118)) %>%
   inner_join(ics_imd) %>%
   select(-CCG21NM)
 
-ics_hypertension_data <- ics_hypertension_data[,c(2,7,1,4,3,11,5,8:10,22,23,6,18,19,24,25)]
+ics_hypertension_data <- ics_hypertension_data[,c(2,7,1,4,3,5,8,16,9,10,15,6,17:20)]
 
 msoa_hypertension_data <- merge(lsoa_hypertension_data, lsoa_msoa, by.x = 'LSOA11CD', by.y = 'lsoa11cd') %>%
   group_by(msoa11cd, msoa11nm) %>%
   summarise(observed_hypertension_prevalence = mean(observed_hypertension_prevalence), 
             age_std_hypertension_prevalence = mean(age_std_hypertension_prevalence), 
-            undiagnosed_rate = mean(undiagnosed_rate), 
             msoa_pop = sum(lsoa_pop), 
+            undiagnosed_rate = mean(undiagnosed_rate), 
             number_undiagnosed = sum(number_undiagnosed), 
             excess_stroke = sum(excess_stroke), 
             excess_mi = sum(excess_mi),
-            costs_saved_from_excess_stroke = sum(costs_saved_from_excess_stroke), 
-            costs_saved_from_excess_mi = sum(costs_saved_from_excess_mi),
             imd_score = mean(imd_score),
             SICBL22CD = paste(unique(SICBL22CD)), 
             SICBL22NM = paste(unique(SICBL22NM))) %>%
   mutate(imd_decile = ntile(desc(imd_score),10))
 
-msoa_hypertension_data <- msoa_hypertension_data[,c(1:12,15,13,14)]
+msoa_hypertension_data <- msoa_hypertension_data[,c(1:10,13,11,12)]
 
 msoa_treatment_data <- merge(lsoa_treatment_data, lsoa_msoa, by.x = 'LSOA11CD', by.y = 'lsoa11cd') %>%
   group_by(msoa11cd, msoa11nm) %>%
@@ -2992,15 +2967,12 @@ msoa_treatment_data <- merge(lsoa_treatment_data, lsoa_msoa, by.x = 'LSOA11CD', 
             msoa_pop = sum(lsoa_pop), 
             preventable_strokes = sum(preventable_strokes), 
             preventable_mi = sum(preventable_mi),
-            costs_saved_from_preventable_stroke = sum(costs_saved_from_prevented_stroke), 
-            costs_saved_from_preventable_mi = sum(costs_saved_from_prevented_mi),
             SICBL22CD = paste(unique(SICBL22CD)), 
             SICBL22NM = paste(unique(SICBL22NM)))
   
 # Exporting as CSV
 write_csv(lsoa_hypertension_data, "lsoa_hypertension_data.csv")
 write_csv(lsoa_treatment_data, "lsoa_treatment_data.csv") 
-write_csv(lsoa_hypertension_plus_treatment, "lsoa_hypertension_and_treatment_data.csv")
 
 write_csv(msoa_hypertension_data, "msoa_hypertension_data.csv")
 write_csv(msoa_treatment_data, "msoa_treatment_data.csv")
