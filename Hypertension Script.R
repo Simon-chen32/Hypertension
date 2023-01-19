@@ -842,50 +842,6 @@ ggplot(midlands_imd, aes(x = imd_score, y = obs_over_exp)) +
   stat_smooth(method = 'lm', col = 'red', size = 1) + 
   labs(x = "IMD Score", y = "Reported Prevalence to Expected")
 
-# Try and break down CCG by MSOA/LSOA
-#### Including LSOA to MSOA Lookup file for Plotting Distribution of Prevalence ####
-lsoa_msoa <- read_csv("~/Lookup Files/PCD_OA_LSOA_MSOA_LAD_AUG22_UK_LU.csv") %>%
-  select(lsoa11cd, msoa11cd, msoa11nm) %>%
-  group_by(lsoa11cd) %>%
-  summarise(msoa11cd = paste(unique(msoa11cd)), 
-            msoa11nm = paste(unique(msoa11nm)))
-
-# Selecting Stoke on Trent
-stoke_on_trent_hyp <- subset(midlands_imd, CCG21CD == 'E38000175')
-# Finding the Mean IMD Score in Stoke-on-Trent
-mean(stoke_on_trent_hyp$imd_score) # 33.31
-# Aggregating at MSOA for plotting purposes
-stoke_msoa <- merge(stoke_on_trent_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
-  group_by(MSOA11CD, MSOA11NM) %>%
-  summarise(age_std_prev = mean(age_std_prev), 
-            obs_over_exp = mean(obs_over_exp), 
-            imd_score = mean(imd_score), 
-            income_score = mean(income_score_rate), 
-            employment_score = mean(employment_score_rate), 
-            education_training_score = mean(education_skills_and_training_score), 
-            health_disability_score = mean(health_deprivation_and_disability_score),
-            crime_score = mean(crime_score), 
-            living_env_score = mean(living_environment_score), 
-            housing_score = mean(barriers_to_housing_and_services_score))
-
-ggplot(stoke_msoa) + 
-  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev) + 
-  geom_point(size = 3) + coord_flip() +
-  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
-             size = 1) +
-  theme(legend.position = "none")  +
-  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
-       title = "Standardised Hypertension Prevalence by MSOA in Stoke-on-Trent")
-
-tm_shape(stoke_on_trent_hyp) +
-  tm_fill(col = "age_std_prev", border.alpha = 0.5, title = "Hypertension Prevalence %", 
-              legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
-              lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
-  tm_layout(main.title = 'Hypertension Prevalence in Stoke-on-Trent', legend.outside = TRUE) +
-tm_shape(stoke_msoa) + 
-  tm_borders("black", lwd = 1)
-
 ## North-East England ##
 north_east_imd <- merge(north_east_ccg_hyper, LSOA_imd_cl, by.x = "lsoa_code", by.y = "lsoa_code_2011")
 ggplot(north_east_imd, aes(x = imd_score, y = age_std_prev)) + 
@@ -898,68 +854,6 @@ ggplot(north_east_imd, aes(x = imd_score, y = obs_over_exp)) +
   stat_smooth(method = 'lm', col = 'red', size = 1) + 
   labs(x = "IMD Score", y = "Reported Prevalence to Expected")
 
-# Try and break down CCG by MSOA/LSOA
-# County Durham 
-county_durham_hyp <- subset(north_east_imd, CCG21CD == 'E38000234')
-# Finding the Mean IMD Score 
-mean(county_durham_hyp$imd_score) # 27.43
-# Aggregating at MSOA for plotting purposes
-county_durham_msoa <- merge(county_durham_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
-  group_by(MSOA11CD, MSOA11NM) %>%
-  summarise(age_std_prev = mean(age_std_prev), 
-            obs_over_exp = mean(obs_over_exp), 
-            imd_score = mean(imd_score), 
-            income_score = mean(income_score_rate), 
-            employment_score = mean(employment_score_rate), 
-            education_training_score = mean(education_skills_and_training_score), 
-            health_disability_score = mean(health_deprivation_and_disability_score),
-            crime_score = mean(crime_score), 
-            living_env_score = mean(living_environment_score), 
-            housing_score = mean(barriers_to_housing_and_services_score))
-
-ggplot(county_durham_msoa) + 
-  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
-  geom_point() + coord_flip() +
-  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
-             size = 1) +
-  theme(legend.position = "none")  +
-  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
-       title = "Standardised Hypertension Prevalence by MSOA in County Durham")
-
-tm_shape(county_durham_msoa) + 
-  tm_polygons(col = 'age_std_prev', border.alpha = 0.5, title = "Hypertension Prevalence %", 
-              legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, 30, 35, Inf), 
-              lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35+")) +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
-  tm_layout(main.title = 'Hypertension Prevalence in East England', legend.outside = TRUE)
-
-# Sunderland
-sunderland_hyp <- subset(north_east_imd, CCG21CD == 'E38000176')
-# Finding the Mean IMD Score
-mean(sunderland_hyp$imd_score) # 30.64
-# Aggregating at MSOA for plotting purposes
-sunderland_msoa <- merge(sunderland_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
-  group_by(MSOA11CD, MSOA11NM) %>%
-  summarise(age_std_prev = mean(age_std_prev), 
-            obs_over_exp = mean(obs_over_exp), 
-            imd_score = mean(imd_score), 
-            income_score = mean(income_score_rate), 
-            employment_score = mean(employment_score_rate), 
-            education_training_score = mean(education_skills_and_training_score), 
-            health_disability_score = mean(health_deprivation_and_disability_score),
-            crime_score = mean(crime_score), 
-            living_env_score = mean(living_environment_score), 
-            housing_score = mean(barriers_to_housing_and_services_score))
-
-ggplot(sunderland_msoa) + 
-  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
-  geom_point() + coord_flip() +
-  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
-             size = 1) +
-  theme(legend.position = "none")  +
-  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
-       title = "Standardised Hypertension Prevalence by MSOA in Sunderland")
-
 ## North-West England ##
 north_west_imd <- merge(north_west_ccg_hyper, LSOA_imd_cl, by.x = "lsoa_code", by.y = "lsoa_code_2011")
 ggplot(north_west_imd, aes(x = imd_score, y = age_std_prev)) + 
@@ -971,88 +865,6 @@ ggplot(north_west_imd, aes(x = imd_score, y = obs_over_exp)) +
   geom_point(aes(color = imd_decile)) + 
   stat_smooth(method = 'lm', col = 'red', size = 1) + 
   labs(x = "IMD Score", y = "Reported Prevalence to Expected")
-
-# Try and break down CCG by MSOA/LSOA
-# St Helens
-st_helens_hyp <- subset(north_west_imd, CCG21CD == 'E38000172')
-# Finding the Mean IMD Score 
-mean(st_helens_hyp$imd_score) # 31.51
-# Aggregating at MSOA for plotting purposes
-st_helens_msoa <- merge(st_helens_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
-  group_by(MSOA11CD, MSOA11NM) %>%
-  summarise(age_std_prev = mean(age_std_prev), 
-            obs_over_exp = mean(obs_over_exp), 
-            imd_score = mean(imd_score), 
-            income_score = mean(income_score_rate), 
-            employment_score = mean(employment_score_rate), 
-            education_training_score = mean(education_skills_and_training_score), 
-            health_disability_score = mean(health_deprivation_and_disability_score),
-            crime_score = mean(crime_score), 
-            living_env_score = mean(living_environment_score), 
-            housing_score = mean(barriers_to_housing_and_services_score))
-
-ggplot(st_helens_msoa) + 
-  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
-  geom_point() + coord_flip() +
-  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
-             size = 1) +
-  theme(legend.position = "none")  +
-  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
-       title = "Standardised Hypertension Prevalence by MSOA in St Helens")
-
-# Tameside and Glossop
-tameside_and_glossop_hyp <- subset(north_west_imd, CCG21CD == 'E38000182')
-# Finding the Mean IMD Score 
-mean(tameside_and_glossop_hyp$imd_score) # 29.12
-# Aggregating at MSOA for plotting purposes
-tameside_and_glossop_msoa <- merge(tameside_and_glossop_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
-  group_by(MSOA11CD, MSOA11NM) %>%
-  summarise(age_std_prev = mean(age_std_prev), 
-            obs_over_exp = mean(obs_over_exp), 
-            imd_score = mean(imd_score), 
-            income_score = mean(income_score_rate), 
-            employment_score = mean(employment_score_rate), 
-            education_training_score = mean(education_skills_and_training_score), 
-            health_disability_score = mean(health_deprivation_and_disability_score),
-            crime_score = mean(crime_score), 
-            living_env_score = mean(living_environment_score), 
-            housing_score = mean(barriers_to_housing_and_services_score))
-
-ggplot(tameside_and_glossop_msoa) + 
-  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
-  geom_point() + coord_flip() +
-  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
-             size = 1) +
-  theme(legend.position = "none")  +
-  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
-       title = "Standardised Hypertension Prevalence by MSOA in Tameside and Glossop")
-
-# Halton
-halton_hyp <- subset(north_west_imd, CCG21CD == 'E38000068')
-# Finding the Mean IMD Score
-mean(halton_hyp$imd_score) # 32.88
-# Aggregating at MSOA for plotting purposes
-halton_msoa <- merge(halton_hyp, lsoa_msoa, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
-  group_by(MSOA11CD, MSOA11NM) %>%
-  summarise(age_std_prev = mean(age_std_prev), 
-            obs_over_exp = mean(obs_over_exp), 
-            imd_score = mean(imd_score), 
-            income_score = mean(income_score_rate), 
-            employment_score = mean(employment_score_rate), 
-            education_training_score = mean(education_skills_and_training_score), 
-            health_disability_score = mean(health_deprivation_and_disability_score),
-            crime_score = mean(crime_score), 
-            living_env_score = mean(living_environment_score), 
-            housing_score = mean(barriers_to_housing_and_services_score))
-
-ggplot(halton_msoa) + 
-  aes(x = reorder(MSOA11NM, -age_std_prev), y = age_std_prev, color = MSOA11NM) + 
-  geom_point() + coord_flip() +
-  geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
-             size = 1) +
-  theme(legend.position = "none")  +
-  labs(y = "Age Standardised Prevalence Rate (%)", x = "MSOA", 
-       title = "Standardised Hypertension Prevalence by MSOA in Halton")
 
 ## South-East England ## 
 south_east_imd <-  merge(south_east_ccg_hyper, LSOA_imd_cl, by.x = "lsoa_code", by.y = "lsoa_code_2011")
@@ -1700,17 +1512,38 @@ lsoa_uncontrolled_prev <- lsoa_hyper_prev %>%
          preventable_mi = floor(tot_untreated/118))
 
 lsoa_uncontrolled_quintile <- lsoa_uncontrolled_prev %>%
-  mutate(uncontrolled_quintile = ntile(untreated_perc, 5)) %>%
+  mutate(uncontrolled_quintile = ntile(needed_for_80_treat, 5)) %>%
   mutate(across(uncontrolled_quintile, as_factor))%>%
   group_by(uncontrolled_quintile) %>%
   summarise(population = sum(lsoa_pop),
-            tot_untreated = sum(tot_untreated)) %>%
+            tot_untreated = sum(untreated_80percent)) %>%
   mutate(preventable_strokes = floor(tot_untreated/67), 
          preventable_mi = floor(tot_untreated/118), 
          total_costs_stroke_per_yr = (preventable_strokes)*(50850.72/5), 
          total_costs_mi_per_yr = (preventable_mi)*2052.12,
          hypertension_costs = (tot_untreated)*161.67, 
          costs_saved = round(total_costs_stroke_per_yr+total_costs_mi_per_yr-hypertension_costs, 2))
+
+se_uncontrolled <- merge(lsoa_uncontrolled_prev, lsoa_region, by.x = "lsoa_code", by.y = "LSOA11CD") %>%
+  select(-FID) %>%
+  filter(NHSER21CD == "E40000005") %>% # SE England ONS Code
+  mutate(uncontrolled_quintile = ntile(needed_for_80_treat, 5)) %>%
+  mutate(across(uncontrolled_quintile, as_factor)) %>%
+  group_by(uncontrolled_quintile) %>%
+  summarise(population = sum(lsoa_pop),
+            tot_untreated = sum(untreated_80percent)) %>%
+  mutate(preventable_strokes = floor(tot_untreated/67), 
+         preventable_mi = floor(tot_untreated/118), 
+         total_costs_stroke_per_yr = (preventable_strokes)*(50850.72/5), 
+         total_costs_mi_per_yr = (preventable_mi)*2052.12,
+         hypertension_costs = (tot_untreated)*161.67, 
+         costs_saved = round(total_costs_stroke_per_yr+total_costs_mi_per_yr-hypertension_costs, 2))
+
+se_uncontrolled_ungrouped <- merge(lsoa_uncontrolled_prev, lsoa_region, by.x = "lsoa_code", by.y = "LSOA11CD") %>%
+  select(-FID) %>%
+  filter(NHSER21CD == "E40000005") %>% # SE England ONS Code
+  mutate(uncontrolled_quintile = ntile(untreated_perc, 10)) %>%
+  mutate(across(uncontrolled_quintile, as_factor))
 
 lsoa_uncontrolled_imd <- merge(lsoa_uncontrolled_prev, LSOA_imd, by.x = "lsoa_code", by.y = "lsoa_code_2011") %>%
   mutate(imd_decile = ntile(imd_score, 10)) %>%
@@ -1760,27 +1593,33 @@ regional_undiagnosed_excess <- regional_abs_undiagnosed %>%
 
 # Finding the impact of missed diagnosis due to COVID
 sub_icb_missed_excess <- missed_all %>%
-  mutate(excess_stroke = floor(undiagnosed_22/67),
-         excess_stroke_LB = floor(undiagnosed_22/84),
-         excess_stroke_UB = floor(undiagnosed_22/57), 
-         excess_mi = floor(undiagnosed_22/118),
-         excess_mi_LB = floor(undiagnosed_22/171), 
-         excess_mi_UB = floor(undiagnosed_22/94),
+  mutate(excess_stroke = ceiling(missed_21/67),
+         excess_stroke_LB = ceiling(missed_21/84),
+         excess_stroke_UB = ceiling(missed_21/57), 
+         excess_mi = ceiling(missed_21/118),
+         excess_mi_LB = ceiling(missed_21/171), 
+         excess_mi_UB = ceiling(missed_21/94),
          total_costs_stroke_per_yr = (excess_stroke)*(50850.72/5), 
          total_costs_mi_per_yr = (excess_mi)*2052.12,
-         hypertension_costs = (undiagnosed_22)*161.67, 
+         hypertension_costs = (missed_21)*161.67, 
          costs_saved_stroke = total_costs_stroke_per_yr+total_costs_mi_per_yr-hypertension_costs,
-         missed_diagnoses_per_100000 = round(undiagnosed_22/(sub_icb_pop/100000), digits = 2)) %>%
+         missed_diagnoses_per_100000 = round(missed_21/(sub_icb_pop/100000), digits = 2)) %>%
 #  select(-c(obs_prev_21:age_std_prev_22)) %>%
-  rename(missed_diagnoses = undiagnosed_22, 
-         missed_diagnoses_prev = prev_diff_22)
+  rename(missed_diagnoses = missed_21, 
+         missed_diagnoses_prev = prev_diff_21)
 
-ics_imd <- merge(LSOA_imd_cl, lsoa_ccg_la, by.x = "lsoa_code_2011", by.y = "LSOA11CD") %>%
+top_10_missed <- sub_icb_missed %>%
+  
+
+ics_imd <- merge(LSOA_imd_cl, lsoa_ccg_pop_merge, by.x = "lsoa_code_2011", by.y = "lsoa_code") %>%
   group_by(CCG21CD, CCG21NM, CCG21CDH) %>%
-  summarise(imd_score = mean(imd_score)) %>%
+  summarise(ccg_pop = sum(lsoa_pop), 
+            imd_score = sum((lsoa_pop/ccg_pop)*imd_score)) %>%
   ungroup() %>%
   mutate(imd_decile = ntile(desc(imd_score), 10)) %>%
   mutate(across(imd_decile, as_factor))
+
+write_csv(ics_imd, "ics_imd.csv")
 
 imd_missed <- merge(ics_imd, sub_icb_missed_excess, by.x = c("CCG21CD", "CCG21NM", "CCG21CDH"), 
                     by.y = c("CCG21CD", "CCG21NM", "ccg_code"))
@@ -2127,31 +1966,6 @@ ggplot(preventable_events_costs, aes(x = uncontrolled_quintile)) +
         axis.text = element_text(size = 16), 
         axis.title = element_text(size = 24))
 
-# MI
-preventable_mi_costs <- lsoa_uncontrolled_quintile80[order(lsoa_uncontrolled_quintile80$uncontrolled_quintile, 
-                                                               decreasing = T), ]
-
-preventable_mi_costs$uncontrolled_quintile <- factor(preventable_mi_costs$uncontrolled_quintile, 
-                                                         levels = preventable_mi_costs$uncontrolled_quintile)
-# Creating Cumulative Sum of Costs Saved
-preventable_mi_costs$cumulative <- cumsum(preventable_mi_costs$costs_saved_from_prevented_mi80) 
-# Converting Cumulative Sum to a Percentage
-preventable_mi_costs$cumulative <- 100 * preventable_mi_costs$cumulative/tail(preventable_mi_costs$cumulative, n = 1)
-# Adjusting Right Hand Scale
-scaleRight_micosts <- tail(preventable_mi_costs$cumulative, n = 1)/head(preventable_mi_costs$costs_saved_from_prevented_mi80, n = 1)
-
-ggplot(preventable_mi_costs, aes(x = uncontrolled_quintile)) +
-  geom_bar(aes(y = costs_saved_from_prevented_mi80/1000000), fill = "#e93f6f", stat = "identity") + 
-  geom_path(aes(y = cumulative/scaleRight_micosts/1000000, group = 1), color = "black", lwd = 2.5) + 
-  geom_point(aes(y = cumulative/scaleRight_micosts/1000000, group = 1), color = 'black', size = 5) + 
-  scale_y_continuous(sec.axis = sec_axis(~.*scaleRight_micosts*1000000, name = "Cumulative (%)")) +
-  theme(axis.text.x = element_text(vjust = 0.5)) +
-  labs(x = 'Uncontrolled Hypertension Quintile (5 is Most Uncontrolled)', y = 'Costs (in Millions £)') +
-  theme(panel.background = element_blank(), 
-        panel.grid.major =  element_blank(), 
-        axis.line = element_line(colour = "black"), 
-        axis.text = element_text(size = 16), 
-        axis.title = element_text(size = 24))
 # IMD
 imd_costs <- lsoa_uncontrolled_imd[order(lsoa_uncontrolled_imd$imd_decile, 
                                                                decreasing = T), ]
@@ -2176,36 +1990,8 @@ ggplot(imd_costs, aes(x = imd_decile)) +
         axis.text = element_text(size = 16), 
         axis.title = element_text(size = 24)) +
   labs(title = 'Costs of Strokes Resulting from Uncontrolled Hypertension', 
-       x = 'IMD Decile (10 is Most Deprived)', y = 'Costs (in Thousands £)') + 
-  theme(panel.background = element_blank(), 
-        panel.grid.major =  element_blank(), 
-        axis.line = element_line(colour = "black"))
+       x = 'IMD Decile (10 is Most Deprived)', y = 'Costs (in Thousands £)') 
 
-imd_mi_costs <- lsoa_uncontrolled_imd[order(lsoa_uncontrolled_imd$imd_decile, 
-                                                decreasing = T), ]
-
-imd_mi_costs$imd_decile <- factor(imd_mi_costs$imd_decile, 
-                                      levels = imd_mi_costs$imd_decile)
-# Creating Cumulative Sum of Costs Saved
-imd_mi_costs$cumulative <- cumsum(imd_mi_costs$costs_saved_from_prevented_mi80) 
-# Converting Cumulative Sum to a Percentage
-imd_mi_costs$cumulative <- 100 * imd_mi_costs$cumulative/tail(imd_mi_costs$cumulative, n = 1)
-# Adjusting Right Hand Scale
-scaleRight_miIMDcosts <- tail(imd_mi_costs$cumulative, n = 1)/head(imd_mi_costs$costs_saved_from_prevented_mi80, n = 1)
-
-ggplot(imd_mi_costs, aes(x = imd_decile)) +
-  geom_bar(aes(y = costs_saved_from_prevented_mi80/1000000), fill = "#e93f6f", stat = "identity") + 
-  geom_path(aes(y = cumulative/scaleRight_miIMDcosts/1000000, group = 1), color = "black", lwd = 3) + 
-  geom_point(aes(y = cumulative/scaleRight_miIMDcosts/1000000, group = 1), color = 'black', lwd = 5) + 
-  scale_y_continuous(sec.axis = sec_axis(~.*scaleRight_miIMDcosts*1000000, name = "Cumulative (%)")) +
-  theme(axis.text.x = element_text(vjust = 0.5),
-        panel.background = element_blank(), 
-        panel.grid.major =  element_blank(), 
-        axis.line = element_line(colour = "black"), 
-        axis.text = element_text(size = 16), 
-        axis.title = element_text(size = 24)) +
-  labs(title = 'Costs of MI Resulting from Uncontrolled Hypertension', 
-       x = 'IMD Decile (10 is Most Deprived)', y = 'Costs (in Millions £)') 
 # Region
 lsoa_region_uncontrolled_prev <- merge(lsoa_uncontrolled_prev, lsoa_region, by.x = "lsoa_code", by.y = "LSOA11CD") %>%
   group_by(NHSER21NM,NHSER21CD) %>%
@@ -2226,26 +2012,30 @@ region_stroke_costs <- lsoa_region_uncontrolled_prev[order(lsoa_region_uncontrol
 
 region_stroke_costs$NHSER21NM <- factor(region_stroke_costs$NHSER21NM, 
                                                          levels = region_stroke_costs$NHSER21NM)
-# Creating Cumulative Sum of Costs Saved
-region_stroke_costs$cumulative <- cumsum(region_stroke_costs$costs_saved_from_prevented_strokes80) 
-# Converting Cumulative Sum to a Percentage
-region_stroke_costs$cumulative <- 100 * region_stroke_costs$cumulative/tail(region_stroke_costs$cumulative, n = 1)
-# Adjusting Right Hand Scale
-scaleRight_StrokeRegioncosts <- tail(region_stroke_costs$cumulative, n = 1)/head(region_stroke_costs$costs_saved_from_prevented_strokes80, n = 1)
+# SE England
+se_costs <- se_uncontrolled[order(se_uncontrolled$costs_saved, decreasing = T), ]
 
-ggplot(region_stroke_costs, aes(x = NHSER21NM)) +
-  geom_bar(aes(y = costs_saved_from_prevented_strokes80/1000000), fill = "#00a3c7", stat = "identity") + 
-  geom_path(aes(y = cumulative/scaleRight_StrokeRegioncosts/1000000, group = 1), color = "red") + 
-  geom_point(aes(y = cumulative/scaleRight_StrokeRegioncosts/1000000, group = 1), color = 'black') + 
-  scale_y_continuous(sec.axis = sec_axis(~.*scaleRight_StrokeRegioncosts*1000000, name = "Cumulative (%)")) +
+se_costs$NHSER21NM <- factor(se_costs$uncontrolled_quintile, levels = se_costs$uncontrolled_quintile)
+
+# Creating Cumulative Sum of Costs Saved
+se_costs$cumulative <- cumsum(se_costs$costs_saved) 
+# Converting Cumulative Sum to a Percentage
+se_costs$cumulative <- 100 * se_costs$cumulative/tail(se_costs$cumulative, n = 1)
+# Adjusting Right Hand Scale
+scaleRight_SECosts <- tail(se_costs$cumulative, n = 1)/head(se_costs$costs_saved, n = 1)
+
+ggplot(se_costs, aes(x = NHSER21NM)) +
+  geom_bar(aes(y = costs_saved/1000000), fill = "#00a3c7", stat = "identity") + 
+  geom_path(aes(y = cumulative/scaleRight_SECosts/1000000, group = 1), color = "black", lwd = 3) + 
+  geom_point(aes(y = cumulative/scaleRight_SECosts/1000000, group = 1), color = 'black', size = 5) + 
+  scale_y_continuous(sec.axis = sec_axis(~.*scaleRight_SECosts*1000000, name = "Cumulative (%)")) +
   theme(axis.text.x = element_text(vjust = 0.5)) +
-  labs(title = 'Costs of Strokes Resulting from Uncontrolled Hypertension', 
-       x = 'NHS Region', y = 'Costs (in Millions £)') + 
+  labs(x = 'Uncontrolled Hypertension Quintile (5 is Most Uncontrolled)', y = 'Costs (in Millions £)') + 
   theme(panel.background = element_blank(), 
         panel.grid.major =  element_blank(), 
-        axis.line = element_line(colour = "black"))
-
-
+        axis.line = element_line(colour = "black"), 
+        axis.text = element_text(size = 16), 
+        axis.title = element_text(size = 24))
 
 #### Regional Pareto Charts ####
 midlands_undiagnosed <- abs_undiagnosed_lsoa_region %>%
@@ -2749,6 +2539,20 @@ ggplot(ics_total_costs, aes(x = SICBL22NM)) +
         panel.grid.major =  element_blank(), 
         axis.line = element_line(colour = "black"))
 
+ics_total_costs_top_20perc <- ics_total_costs %>%
+  filter(cumulative <= 48)
+
+top20perc_shp <- merge(Eng_CCG, ics_total_costs_top_20perc, by.x = c('CCG21CD', 'CCG21NM'), 
+                       by.y = c("SICBL22CD", "SICBL22NM"))
+
+tm_shape(Eng_CCG) + 
+  tm_borders(col = "black") +
+tm_shape(top20perc_shp) + 
+  tm_polygons(col = "#00a3c7") + 
+  tm_compass(position = c("left", "top")) + 
+  tm_scale_bar(position = c("right", "bottom")) + 
+  tm_layout(main.title = "Location of Top 20% of Uncontrolled Hypertension", legend.outside = T)
+
 #### Mapping ####
 # mapping where the events are
 top_quintile_undiagnosed <- undiagnosed_decile %>%
@@ -2983,3 +2787,30 @@ write_csv(ics_treatment_data, "ics_treatment_data.csv")
 national_prev <- lsoa_treatment_data$lsoa_pop/sum(lsoa_treatment_data$lsoa_pop)*
   lsoa_treatment_data$over80_treatment_rate
 sum(national_prev)
+
+se_ics <- ics_treatment_data %>%
+  filter(NHSER21NM == "South East")
+
+se_undiagnosed <- se_ics[order(se_ics$overall_treatment_rate, decreasing = T), ]
+
+se_undiagnosed$SICBL22CD <- factor(se_undiagnosed$SICBL22CD, levels = se_undiagnosed$SICBL22CD)
+
+# Creating Cumulative Sum of Costs Saved
+se_undiagnosed$cumulative <- cumsum(se_undiagnosed$overall_treatment_rate) 
+# Converting Cumulative Sum to a Percentage
+se_undiagnosed$cumulative <- se_undiagnosed$cumulative/tail(se_undiagnosed$cumulative, n = 1)
+# Adjusting Right Hand Scale
+scaleRight_TreatmentSE <- tail(se_undiagnosed$cumulative, n = 1)/head(se_undiagnosed$overall_treatment_rate, n = 1)
+
+se_undiagnosed$SICBL22NM[se_undiagnosed$SICBL22NM == "NHS Hampshire, Southampton and Isle of Wight CCG"] <- "NHS Hampshire and Southampton CCG"
+
+ggplot(se_undiagnosed, aes(x = SICBL22NM)) +
+  geom_bar(aes(y = overall_treatment_rate), fill = "#00a3c7", stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  scale_y_continuous(breaks = c(0, 10, 20, 30, 40, 50, 60, 70, 80)) +
+  labs(x = 'Sub-ICB', y = 'Treatment Rate') + 
+  theme(panel.background = element_blank(), 
+        panel.grid.major =  element_blank(), 
+        axis.line = element_line(colour = "black"), 
+        axis.text = element_text(size = 11), 
+        axis.title = element_text(size = 18))
