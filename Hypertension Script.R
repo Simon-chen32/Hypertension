@@ -1488,7 +1488,6 @@ regional_totals <- abs_hyper_region %>%
   summarise(missed_diagnoses_total = round(sum(missed_21), 0), 
             region_pop = sum(sub_icb_pop))
 
-
 #### Objective 4 ####
 # Looking into Number of Uncontrolled cases of Hypertension 
 # Load in LSOA level data from GP's Analysis
@@ -1607,9 +1606,6 @@ sub_icb_missed_excess <- missed_all %>%
 #  select(-c(obs_prev_21:age_std_prev_22)) %>%
   rename(missed_diagnoses = missed_21, 
          missed_diagnoses_prev = prev_diff_21)
-
-top_10_missed <- sub_icb_missed %>%
-  
 
 ics_imd <- merge(LSOA_imd_cl, lsoa_ccg_pop_merge, by.x = "lsoa_code_2011", by.y = "lsoa_code") %>%
   group_by(CCG21CD, CCG21NM, CCG21CDH) %>%
@@ -1788,32 +1784,7 @@ lsoa_hypertension_imd_decile <- merge(abs_undiagnosed_lsoa, LSOA_imd, by.x = 'ls
          excess_mi = floor(undiagnosed/118), 
          undiagnosed_per_100000 = round(undiagnosed/(population/100000), digits = 2))
 
-
 ##
-
-ggplot(decile_cumulative, aes(x = obs_decile, y = excess_stroke)) +
-  stat_pareto(point.color = "red", 
-              point.size = 1, 
-              line.color = "black") + 
-  labs(title = "Preventable Strokes by Hypertension Decile", 
-       x = "Hypertension Prevalence Decile", 
-       y = "Prevented Strokes")
-
-ggplot(decile_cumulative, aes(x = obs_decile, y = excess_mi)) +
-  stat_pareto(point.color = "red", 
-              point.size = 1, 
-              line.color = "black") +
-  labs(title = "Preventable MI by Hypertension Decile", 
-       x = "Hypertension Prevalence Decile", 
-       y = "Prevented Cases of MI")
-
-ggplot(undiagnosed_decile, aes(x = ntile, y = excess_stroke)) +
-  stat_pareto(point.color = "red", 
-              point.size = 1, 
-              line.color = "black") + 
-  labs(title = "Preventable Strokes by Undiagnosed Hypertension Decile", 
-       x = "Undiagnosed Hypertension Decile", 
-       y = "Prevented Strokes")
 
 ggplot(decile_cumulative, aes(x = obs_decile, fill = obs_decile)) +
   scale_fill_manual(values = c("#fcdadb", "#f5c2c3", "#efaaaa", "#e89192", "#e2797a", "#db6161", "#d54949", "#ce3031", "#c81818", "#c10000")) + 
@@ -1860,7 +1831,7 @@ ggplot(lsoa_hypertension_imd_decile, aes(x = imd_decile, fill = imd_decile)) +
 
 ggplot(lsoa_uncontrolled_imd, aes(x = imd_decile, fill = imd_decile)) +
   scale_fill_manual(values = c("#fcdadb", "#f5c2c3", "#efaaaa", "#e89192", "#e2797a", "#db6161", "#d54949", "#ce3031", "#c81818", "#c10000")) + 
-  geom_col(aes(y = tot_untreated/1000)) +
+  geom_col(aes(y = )) +
 #  geom_point(aes(y = tot_untreated/1000), size = 3) +
 #  geom_path(aes(y = tot_untreated/1000, group = 1)) +
   labs(x = "IMD Decile (10 is Most Deprived)", 
@@ -1888,16 +1859,7 @@ ggplot(imd_missed_decile, aes(x = imd_decile, fill = imd_decile)) +
         axis.text = element_text(size = 16), 
         axis.title = element_text(size = 24))
 
-# Done by Region
-ggplot(regional_undiagnosed_excess, aes(x = NHSER21NM, y = excess_stroke)) +
-  stat_pareto(point.color = "red", 
-              point.size = 2, 
-              line.color = "black") + 
-  labs(title = "Preventable Stroke by Region", 
-       x = "NHS England Region", 
-       y = "Prevented Cases of Stroke")
-
-# adjusting right hand axis 
+# Stroke - adjusting right hand axis 
 undiagnosed_excess_stroke <- undiagnosed_excess[order(undiagnosed_excess$undiagnosed_hypertension, 
                                                decreasing = T), ]
 
@@ -1919,6 +1881,7 @@ ggplot(undiagnosed_excess_stroke, aes(x = sub_icb_loc_name)) +
   labs(title = 'Preventable Strokes by ICS', 
        x = 'ICS', y = 'Prevented Cases of Stroke')
 
+# MI
 undiagnosed_excess_mi <- undiagnosed_excess[order(undiagnosed_excess$undiagnosed_hypertension, 
                                                       decreasing = T), ]
 
@@ -1967,8 +1930,7 @@ ggplot(preventable_events_costs, aes(x = uncontrolled_quintile)) +
         axis.title = element_text(size = 24))
 
 # IMD
-imd_costs <- lsoa_uncontrolled_imd[order(lsoa_uncontrolled_imd$imd_decile, 
-                                                               decreasing = T), ]
+imd_costs <- lsoa_uncontrolled_imd[order(lsoa_uncontrolled_imd$imd_decile, decreasing = T), ]
 
 imd_costs$imd_decile <- factor(imd_costs$imd_decile,levels = imd_costs$imd_decile)
 # Creating Cumulative Sum of Costs Saved
@@ -2037,154 +1999,6 @@ ggplot(se_costs, aes(x = NHSER21NM)) +
         axis.text = element_text(size = 16), 
         axis.title = element_text(size = 24))
 
-#### Regional Pareto Charts ####
-midlands_undiagnosed <- abs_undiagnosed_lsoa_region %>%
-  dplyr::filter(NHSER21NM == "Midlands") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
-
-midlands_undiagnosed_grouped <- midlands_undiagnosed %>%
-  group_by(undiagnosed_quintile) %>%
-  summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed)) %>%
-  dplyr::mutate(across(undiagnosed_quintile, as_factor),
-                excess_stroke = floor(undiagnosed/67), 
-                excess_mi = floor(undiagnosed/118))
-
-ggplot(midlands_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
-  stat_pareto(point.color = "red", 
-              point.size = 2, 
-              line.color = "black") +
-  labs(title = "Preventable Strokes in the Midlands", 
-       x = "Undiagnosed Quintile", 
-       y = "Preventable Cases of Stroke")
-
-# East of England 
-east_england_undiagnosed <- abs_undiagnosed_lsoa_region %>%
-  dplyr::filter(NHSER21NM == "East of England") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
-
-east_england_undiagnosed_grouped <- east_england_undiagnosed %>%
-  group_by(undiagnosed_quintile) %>%
-  summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed)) %>%
-  dplyr::mutate(across(undiagnosed_quintile, as_factor),
-                excess_stroke = floor(undiagnosed/67), 
-                excess_mi = floor(undiagnosed/118))
-
-ggplot(east_england_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
-  stat_pareto(point.color = "red", 
-              point.size = 2, 
-              line.color = "black") +
-  labs(title = "Preventable Strokes in the East of England", 
-       x = "Undiagnosed Quintile", 
-       y = "Preventable Cases of Stroke")
-
-# London 
-london_undiagnosed <- abs_undiagnosed_lsoa_region %>%
-  dplyr::filter(NHSER21NM == "London") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
-
-london_undiagnosed_grouped <- london_undiagnosed %>%
-  group_by(undiagnosed_quintile) %>%
-  summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed)) %>%
-  dplyr::mutate(across(undiagnosed_quintile, as_factor),
-                excess_stroke = floor(undiagnosed/67), 
-                excess_mi = floor(undiagnosed/118))
-
-ggplot(london_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
-  stat_pareto(point.color = "red", 
-              point.size = 2, 
-              line.color = "black") +
-  labs(title = "Preventable Strokes in London", 
-       x = "Undiagnosed Quintile", 
-       y = "Preventable Cases of Stroke")
-
-
-# North-East and Yorkshire 
-north_east_undiagnosed <- abs_undiagnosed_lsoa_region %>%
-  dplyr::filter(NHSER21NM == "North East and Yorkshire") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
-
-north_east_undiagnosed_grouped <- north_east_undiagnosed %>%
-  group_by(undiagnosed_quintile) %>%
-  summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed)) %>%
-  dplyr::mutate(across(undiagnosed_quintile, as_factor),
-                excess_stroke = floor(undiagnosed/67), 
-                excess_mi = floor(undiagnosed/118))
-
-ggplot(north_east_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
-  stat_pareto(point.color = "red", 
-              point.size = 2, 
-              line.color = "black") +
-  labs(title = "Preventable Strokes in the North East and Yorkshire", 
-       x = "Undiagnosed Quintile", 
-       y = "Preventable Cases of Stroke")
-
-# North-West
-north_west_undiagnosed <- abs_undiagnosed_lsoa_region %>%
-  dplyr::filter(NHSER21NM == "North West") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
-
-north_west_undiagnosed_grouped <- north_west_undiagnosed %>%
-  group_by(undiagnosed_quintile) %>%
-  summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed)) %>%
-  dplyr::mutate(across(undiagnosed_quintile, as_factor),
-                excess_stroke = floor(undiagnosed/67), 
-                excess_mi = floor(undiagnosed/118))
-
-ggplot(north_west_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
-  stat_pareto(point.color = "red", 
-              point.size = 2, 
-              line.color = "black") +
-  labs(title = "Preventable Strokes in the North West", 
-       x = "Undiagnosed Quintile", 
-       y = "Preventable Cases of Stroke")
-
-# South-East
-south_east_undiagnosed <- abs_undiagnosed_lsoa_region %>%
-  dplyr::filter(NHSER21NM == "South East") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
-
-south_east_undiagnosed_grouped <- south_east_undiagnosed %>%
-  group_by(undiagnosed_quintile) %>%
-  summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed)) %>%
-  dplyr::mutate(across(undiagnosed_quintile, as_factor),
-                excess_stroke = floor(undiagnosed/67), 
-                excess_mi = floor(undiagnosed/118))
-
-ggplot(south_east_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
-  stat_pareto(point.color = "red", 
-              point.size = 2, 
-              line.color = "black") +
-  labs(title = "Preventable Strokes in the South East", 
-       x = "Undiagnosed Quintile", 
-       y = "Preventable Cases of Stroke")
-
-# South-West
-south_west_undiagnosed <- abs_undiagnosed_lsoa_region %>%
-  dplyr::filter(NHSER21NM == "South West") %>%
-  dplyr::mutate(undiagnosed_quintile = ntile(undiagnosed, 5)) 
-
-south_west_undiagnosed_grouped <- south_west_undiagnosed %>%
-  group_by(undiagnosed_quintile) %>%
-  summarise(pop = sum(lsoa_pop),
-            undiagnosed = sum(undiagnosed)) %>%
-  dplyr::mutate(across(undiagnosed_quintile, as_factor),
-                excess_stroke = floor(undiagnosed/67), 
-                excess_mi = floor(undiagnosed/118))
-
-ggplot(south_west_undiagnosed_grouped, aes(x = undiagnosed_quintile, y = excess_stroke)) +
-  stat_pareto(point.color = "red", 
-              point.size = 2, 
-              line.color = "black") +
-  labs(title = "Preventable Strokes in the South West", 
-       x = "Undiagnosed Quintile", 
-       y = "Preventable Cases of Stroke")
-
 #### Waterfall Plots - Excess Strokes ####
 waterfall(values = undiagnosed_decile_grouped$excess_stroke, 
           labels = undiagnosed_decile_grouped$ntile, calc_total = T,
@@ -2204,7 +2018,6 @@ waterfall(values = undiagnosed_decile_grouped$excess_stroke,
   scale_x_discrete(labels = c("Quintile 1", "Quintile 2", "Quintile 3", "Quintile 4", 
                               "Quintile 5", "Total")) +
   scale_y_continuous(expand = c(0,0))
-
 
 waterfall(values = midlands_undiagnosed_grouped$excess_stroke, 
           labels = midlands_undiagnosed_grouped$undiagnosed_quintile, calc_total = T,
