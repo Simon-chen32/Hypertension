@@ -13,6 +13,10 @@ library(ggplot2)
 #### Loading Data #####
 # Loading in Shapefile
 Eng_ICS <- st_read("~/Shapefiles/Sub-ICB Shapefiles/SICBL_JUL_2022_EN_BUC.shp")
+# Rename the three ICS with "Isle" so there are no difficulties with merging
+Eng_ICS$SICBL22NM <- gsub("NHS Cornwall and The Isles Of Scilly ICB - 11N", "NHS Cornwall and the Isles of Scilly ICB - 11N", Eng_ICS$SICBL22NM)
+Eng_ICS$SICBL22NM <- gsub("NHS Hampshire and Isle Of Wight ICB - 10R", "NHS Hampshire and Isle of Wight ICB - 10R", Eng_ICS$SICBL22NM)
+Eng_ICS$SICBL22NM <- gsub("NHS Hampshire and Isle Of Wight ICB - D9Y0V", "NHS Hampshire and Isle of Wight ICB - D9Y0V", Eng_ICS$SICBL22NM)
 
 ENG_LSOA11 <- st_read("~/Shapefiles/LSOA (2011) Shapefiles/infuse_lsoa_lyr_2011.shp") %>% 
   filter(str_detect(geo_code, '^E'))
@@ -122,8 +126,11 @@ GP_lsoa_data <- GP_lsoa_dist %>%
   filter(grepl("E", lsoa_code))
 
 # Loading in some lookup files
-lsoa_ics <- read_csv("~/Lookup Files/LSOA_(2011)_to_Sub_ICB_Locations_to_Integrated_Care_Boards_(July_2022)_Lookup_in_England.csv")
-ics_region <- read_csv("~/Lookup Files/Sub_ICB_Locations_to_ICB_to_NHS_England_(Region)_(July_2022)_Lookup.csv")
+lsoa_ics <- read_csv("~/Lookup Files/LSOA_(2011)_to_Sub_ICB_Locations_to_Integrated_Care_Boards_(July_2022)_Lookup_in_England.csv") %>%
+  select(-ObjectId)
+ics_region <- read_csv("~/Lookup Files/Sub_ICB_Locations_to_ICB_to_NHS_England_(Region)_(July_2022)_Lookup.csv") %>%
+  select(-ObjectId)
+lsoa_region <- inner_join(lsoa_ics, ics_region)
 
 #### Analysis #####
 # Loading in Hypertension Prevalence Data 
@@ -261,7 +268,8 @@ hyper_prev_no_ealing <- hyper_prev_shp %>%
 
 # Plot at CCG Level 
 ics_borders <- merge(Eng_ICS, ics_region, by = c('SICBL22CD', 'SICBL22NM'))
-inter_ics_lsoa_borders <- merge(ENG_LSOA11, ics_aggregated, by.x = 'geo_code', by.y = 'lsoa_code') %>%
+
+inter_ics_lsoa_borders <- merge(ENG_LSOA11, ics_grouped, by.x = 'geo_code', by.y = 'lsoa_code') %>%
   select(-ObjectId)
 shp_df <- inner_join(inter_ics_lsoa_borders, ics_region) %>%
   select(-c(geo_label:name, ObjectId, LAD22CD, LAD22NM))
@@ -624,3 +632,7 @@ ggplot(ics_hypertension_prev) +
 write_csv(Hyper21_22_cl, "QOF Data 2021_22.csv")
 write_csv(lsoa_age_adj, "Age-Adjusted LSOA Hypertension Data.csv")
 write_csv(ics_hypertension_prev, "ICS Hypertension Data.csv")
+write_csv(GP_age_dist_cl, "Cleaned GP Age Distribution.csv")
+write_csv(GP_lsoa_data, "GP LSOA Distribution Data.csv")
+write_csv(lsoa_region, "LSOA to Region Lookup File.csv")
+
