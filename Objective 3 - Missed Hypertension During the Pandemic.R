@@ -1,3 +1,13 @@
+# set working directory 
+setwd("C:/Users/SIMC/Lane Clark & Peacock LLP/CVD PRA Programme - LCP WGs - 03 Secondary prevention/Analysis")
+
+#### Installing Packages ####
+library(tidyverse)
+library(tmap)
+library(sf)
+library(janitor)
+library(stringr)
+library(ggplot2)
 
 #### Objective 3 ####
 #### Loading in QOF data from 2014-15 to 2019-20 ####
