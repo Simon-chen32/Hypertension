@@ -102,7 +102,7 @@ GP_age_dist_cl <- GP_age_dist_wide %>%
          female_u79_perc = (all_female-female80plus)/all_all, 
          female_o80_perc = female80plus/all_all)
 
-LSOA_imd <- read_csv("LSOA_IMD_Scores_Deciles.csv") %>%
+LSOA_imd <- read_csv("~/Hypertension/LSOA_IMD_Scores_Deciles.csv") %>%
   clean_names() %>%
   rename(imd_decile = index_of_multiple_deprivation_imd_decile_where_1_is_most_deprived_10_percent_of_lso_as, 
          imd_score = index_of_multiple_deprivation_imd_score) 
@@ -131,6 +131,10 @@ lsoa_ics <- read_csv("~/Lookup Files/LSOA_(2011)_to_Sub_ICB_Locations_to_Integra
 ics_region <- read_csv("~/Lookup Files/Sub_ICB_Locations_to_ICB_to_NHS_England_(Region)_(July_2022)_Lookup.csv") %>%
   select(-ObjectId)
 lsoa_region <- inner_join(lsoa_ics, ics_region)
+
+ics_population <- merge(GP_lsoa_data, lsoa_ics, by.x = "lsoa_code", by.y = "LSOA11CD") %>%
+  group_by(SICBL22CD, SICBL22NM, SICBL22CDH) %>%
+  summarise(population = sum(number_of_patients))
 
 #### Analysis #####
 # Loading in Hypertension Prevalence Data 
@@ -254,7 +258,7 @@ mean(lsoa_age_adj$age_std_prev) # 15.11
 # Creating a Shapefile to plot prevalence by LSOA
 hypertension_prev_shp <- merge(ENG_LSOA11, lsoa_age_adj, by.x = 'geo_code', by.y = 'lsoa_code')
 
-tm_shape(hypertension_prev_shp) + 
+national_age_std_prev <- tm_shape(hypertension_prev_shp) + 
   tm_polygons(col = 'age_std_prev', border.alpha = 0.5, title = "Age Std. Prev.", 
               legend.hist = TRUE, palette = "-RdBu", breaks = c(0, 5, 10, 15, 20, 25, Inf), 
               lables = c("0-5", "5-10", "10-15", "15-20", "20-25", "25+")) + 
@@ -269,10 +273,9 @@ hyper_prev_no_ealing <- hyper_prev_shp %>%
 # Plot at CCG Level 
 ics_borders <- merge(Eng_ICS, ics_region, by = c('SICBL22CD', 'SICBL22NM'))
 
-inter_ics_lsoa_borders <- merge(ENG_LSOA11, ics_grouped, by.x = 'geo_code', by.y = 'lsoa_code') %>%
-  select(-ObjectId)
+inter_ics_lsoa_borders <- merge(ENG_LSOA11, ics_grouped, by.x = 'geo_code', by.y = 'lsoa_code')
 shp_df <- inner_join(inter_ics_lsoa_borders, ics_region) %>%
-  select(-c(geo_label:name, ObjectId, LAD22CD, LAD22NM))
+  select(-c(geo_label:name, LAD22CD, LAD22NM))
 
 # separate file that aggregates the data
 ics_hypertension_prev <- ics_grouped %>%
@@ -297,7 +300,7 @@ tm_shape(ics_hypertension_shp) +
               legend.hist = TRUE) +
   tm_compass(position = c("left", "top")) + 
   tm_scale_bar() +
-  tm_layout("Age Std. Hypertension Prevalence by CCG", legend.outside = TRUE)
+  tm_layout("Age Std. Hypertension Prevalence by ICS", legend.outside = TRUE)
 
 top10_ccg <- ics_hypertension_shp %>%
   filter(percentile >= 91) %>%
@@ -354,20 +357,12 @@ east_eng_lsoa_hypertension <- subset(shp_df, NHSER22NM == 'East of England')  %>
   rename(lsoa_code = geo_code)
 
 # Looking at Age standardised Prevalence
-ggplot(ccg_hyper) + 
-  aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, color = CCG21NM) + 
+ggplot(ics_grouped) + 
+  aes(x = reorder(SICBL22NM, -age_std_prev), y = age_std_prev, color = SICBL22NM) + 
   geom_boxplot() + coord_flip() +
   geom_hline(aes(yintercept=mean(age_std_prev)), color = 'black', 
              size = 1) +
   theme(legend.position = "none")
-
-tm_shape(ccg_agg_shp) + 
-  tm_polygons(col = 'age_std_prev_21_22', border.alpha = 0.8, title = "Age Std. Prevalence %", legend.hist = TRUE, 
-              palette = "-RdBu") + 
-  tm_compass(position = c("right", "top")) +
-  tm_scale_bar(position = c("right", "bottom")) + 
-  tm_layout(main.title = "Hypertension Prevalence by CCG", legend.outside = TRUE)
-
 
 #### Breaking it Down by Region ####
 # Midlands - Prevalence 
@@ -396,6 +391,7 @@ tm_shape(midlands_lsoa_hypertension) +
   tm_shape(midlands_ics_borders) +
   tm_borders()
 
+''' # Superseded # 
 tm_shape(midlands_lsoa_hypertension) +
   tm_fill(col = 'obs_over_exp', title = "Obs:Exp Ratio", 
           legend.hist = TRUE, palette = "-RdBu",
@@ -405,6 +401,7 @@ tm_shape(midlands_lsoa_hypertension) +
   tm_layout(main.title = 'Expected vs Observed Hypertension Rates in the Midlands', legend.outside = TRUE) +
   tm_shape(midlands_ics_borders) +
   tm_borders('black', lwd = 1)
+'''
 
 # North East and Yorkshire
 ggplot(north_east_lsoa_hypertension) + 
@@ -428,16 +425,6 @@ tm_shape(north_east_lsoa_hypertension) +
           lables = c("<10", "10-12.5", "12.5-15", "15-17.5", "17.5-20", "20+")) + 
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in NE England', legend.outside = TRUE) +
-  tm_shape(north_east_ics_borders) +
-  tm_borders('black', lwd = 1)
-
-tm_shape(north_east_lsoa_hypertension) +
-  tm_fill(col = 'obs_over_exp', title = "Obs:Exp Ratio", 
-          legend.hist = TRUE, palette = "-RdBu",
-          breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
-          labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
-  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in NE England', legend.outside = TRUE) +
   tm_shape(north_east_ics_borders) +
   tm_borders('black', lwd = 1)
 
@@ -466,16 +453,6 @@ tm_shape(north_west_lsoa_hypertension) +
   tm_shape(north_west_ics_borders) +
   tm_borders('black', lwd = 1)
 
-nw_ratio <- tm_shape(north_west_lsoa_hypertension) +
-  tm_fill(col = 'obs_over_exp', title = "Obs:Exp Ratio", 
-          legend.hist = TRUE, palette = "-RdBu",
-          breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
-          labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
-  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in NW England', legend.outside = TRUE) +
-  tm_shape(north_west_ics_borders) +
-  tm_borders('black', lwd = 1)
-
 # London 
 ggplot(london_lsoa_hypertension) + 
   aes(x = reorder(SICBL22NM, -age_std_prev), y = age_std_prev, fill = SICBL22NM) + 
@@ -501,16 +478,6 @@ tm_shape(london_lsoa_hypertension) +
   tm_shape(london_ics_borders) +
   tm_borders('black', lwd = 1)
 
-tm_shape(london_lsoa_hypertension) +
-  tm_fill(col = 'obs_over_exp', title = "Obs:Exp Ratio", 
-          legend.hist = TRUE, palette = "-RdBu",
-          breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
-          labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
-  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in London', legend.outside = TRUE) +
-  tm_shape(london_ccg) +
-  tm_borders('black', lwd = 1)
-
 # SE England
 ggplot(south_east_lsoa_hypertension) + 
   aes(x = reorder(SICBL22NM, -age_std_prev), y = age_std_prev, fill = SICBL22NM) + 
@@ -533,16 +500,6 @@ tm_shape(south_east_lsoa_hypertension) +
           lables = c("<10", "10-12.5", "12.5-15", "15-17.5", "17.5-20", "20+")) +
   tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
   tm_layout(main.title = 'Hypertension Prevalence in SE England', legend.outside = TRUE) +
-  tm_shape(south_east_ics_borders) +
-  tm_borders('black', lwd = 1)
-
-tm_shape(south_east_lsoa_hypertension) +
-  tm_fill(col = 'obs_over_exp', title = "Obs:Exp Ratio", 
-          legend.hist = TRUE, palette = "-RdBu",
-          breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
-          labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
-  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in SE England', legend.outside = TRUE) +
   tm_shape(south_east_ics_borders) +
   tm_borders('black', lwd = 1)
 
@@ -571,16 +528,6 @@ tm_shape(south_west_lsoa_hypertension) +
   tm_shape(south_west_ics_borders) +
   tm_borders('black', lwd = 1)
 
-tm_shape(south_west_lsoa_hypertension) +
-  tm_fill(col = 'obs_over_exp', title = "Obs:Exp Ratio", 
-          legend.hist = TRUE, palette = "-RdBu",
-          breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
-          labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("right", "bottom")) +
-  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in SW England', legend.outside = TRUE) +
-  tm_shape(south_west_ics_borders) +
-  tm_borders('black', lwd = 1)
-
 # East England  
 ggplot(east_eng_ccg_hyper) + 
   aes(x = reorder(CCG21NM, -age_std_prev), y = age_std_prev, fill = CCG21NM) + 
@@ -606,16 +553,6 @@ tm_shape(east_eng_ccg_hyper) +
   tm_shape(east_eng_ccg) +
   tm_borders('black', lwd = 1)
 
-tm_shape(east_eng_ccg_hyper) +
-  tm_fill(col = 'obs_over_exp', title = "Obs:Exp Ratio", 
-          legend.hist = TRUE, palette = "-RdBu",
-          breaks = c(0, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, Inf), 
-          labels = c("<0.5", "0.5-0.7", "0.7-0.9", "0.9-1.1", "1.1-1.3", "1.3-1.5", ">1.5")) +
-  tm_compass(position = c("right", "top")) + tm_scale_bar(position = c("left", "bottom")) +
-  tm_layout(main.title = 'Expected vs Observed Hypertension Rates in East England', legend.outside = TRUE) +
-  tm_shape(east_eng_ccg) +
-  tm_borders('black', lwd = 1) 
-
 # Investigating Regionally
 ggplot(ics_hypertension_prev) + 
   aes(x = reorder(NHSER22NM, -age_std_prev), y = age_std_prev, fill = NHSER22NM) + 
@@ -635,4 +572,4 @@ write_csv(ics_hypertension_prev, "ICS Hypertension Data.csv")
 write_csv(GP_age_dist_cl, "Cleaned GP Age Distribution.csv")
 write_csv(GP_lsoa_data, "GP LSOA Distribution Data.csv")
 write_csv(lsoa_region, "LSOA to Region Lookup File.csv")
-
+write_csv(ics_population, "ICS Population.csv")

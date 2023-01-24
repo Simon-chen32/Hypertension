@@ -9,6 +9,20 @@ library(janitor)
 library(stringr)
 library(ggplot2)
 
+# Loading Data
+# Population Data 
+ics_population <- read_csv("ICS Population.csv")
+# Lookup File
+ics_region <- read_csv("~/Lookup Files/Sub_ICB_Locations_to_ICB_to_NHS_England_(Region)_(July_2022)_Lookup.csv") %>%
+  select(-ObjectId)
+# ICS Shapefile
+Eng_ICS <- st_read("~/Shapefiles/Sub-ICB Shapefiles/SICBL_JUL_2022_EN_BUC.shp")
+# Rename the three ICS with "Isle" so there are no difficulties with merging
+Eng_ICS$SICBL22NM <- gsub("NHS Cornwall and The Isles Of Scilly ICB - 11N", "NHS Cornwall and the Isles of Scilly ICB - 11N", Eng_ICS$SICBL22NM)
+Eng_ICS$SICBL22NM <- gsub("NHS Hampshire and Isle Of Wight ICB - 10R", "NHS Hampshire and Isle of Wight ICB - 10R", Eng_ICS$SICBL22NM)
+Eng_ICS$SICBL22NM <- gsub("NHS Hampshire and Isle Of Wight ICB - D9Y0V", "NHS Hampshire and Isle of Wight ICB - D9Y0V", Eng_ICS$SICBL22NM)
+
+
 #### Objective 3 ####
 #### Loading in QOF data from 2014-15 to 2019-20 ####
 ## 14-15 ##
@@ -207,7 +221,25 @@ Hyper20_21_cl <- Hyper20_21 %>%
 
 
 # 2021-22
-Hyper21_22_ccg <- Hyper21_22 %>%
+Hyper21_22 <- read_csv("~/Hypertension/QOF Data/QOF_Hypertension_21-22.csv", skip = 10) %>%
+  clean_names() %>%
+  rename(list_size_21_22 = list_size_11, 
+         under79_21_22 = list_size_79,
+         over80_21_22 = list_size_ages_80,
+         register_21_22 = register_14,
+         prevalence_percent_21_22 = prevalence_percent_15,
+         under79_numerator_21_22 = numerator_32, 
+         under79_denominator_21_22 = denominator_33, 
+         under79_achievement_net_exceptions_21_22 = underlying_achievement_net_of_pc_as_percent_34,
+         under79_percent_receiving_intervention_21_22 = patients_receiving_intervention_percent_38,
+         over80_numerator_21_22 = numerator_40,
+         over80_denominator_21_22 = denominator_41, 
+         over80_achievement_net_exceptions_21_22 = underlying_achievement_net_of_pc_as_percent_42,
+         over80_percent_receiving_intervention_21_22 = patients_receiving_intervention_percent_46) %>%
+  subset(., under79_denominator_21_22 != 0) %>%
+  subset(., over80_denominator_21_22 != 0)
+  
+Hyper21_22_ics <- Hyper21_22 %>%
   group_by(sub_icb_loc_ods_code) %>%
   summarise(tot_list_size_21_22 = sum(list_size_21_22), 
             tot_register_21_22 = sum(register_21_22), 
@@ -299,7 +331,7 @@ QOF_20_to_21 <- QOF_20_data %>%
 QOF_21 <- merge(QOF_20_to_21, Hyper20_21_cl, by.x = "new_code", by.y = 'ccg_code', all = TRUE) %>%
   rename(ccg_code = new_code)
 
-QOF_22 <- merge(QOF_21, Hyper21_22_ccg, by.x = 'ccg_code', by.y = 'sub_icb_loc_ods_code', all = TRUE) 
+QOF_22 <- merge(QOF_21, Hyper21_22_ics, by.x = 'ccg_code', by.y = 'sub_icb_loc_ods_code', all = TRUE) 
 
 QOF_prev <- QOF_22 %>%
   group_by(ccg_code) %>%
@@ -311,7 +343,7 @@ QOF_prev <- QOF_22 %>%
             obsprev_20 = mean(avg_prevalence_19_20, na.rm = TRUE), 
             obsprev_21 = mean(avg_prevalence_20_21, na.rm = TRUE), 
             obsprev_22 = mean(avg_prevalence_21_22, na.rm = TRUE)) %>%
-  drop_na(ccg_code)
+  drop_na(ccg_code) 
 
 #### Interrupted Time Series Analysis ####
 # Transforming the Data for ITS purposes 
@@ -319,7 +351,8 @@ QOF_prev_long <- QOF_prev %>%
   pivot_longer(!ccg_code,
                names_to = c("category", "year"),
                names_pattern = "([A-Za-z]+)_(\\d+)", # separates variables by characters and then numbers, similar to name_sep but more sophisticated
-               values_to = "score")
+               values_to = "score") %>%
+  rename(SICBL22CDH = ccg_code)
 
 # having pivoted the data long, then want to re-integrate the columns for each variable of interest
 QOF_prev_cl <- QOF_prev_long %>%
@@ -332,35 +365,21 @@ QOF_prev_cl <- QOF_prev_long %>%
 QOF_prev_21_22 <- QOF_prev_cl %>%
   filter(year >= 6)
 
-QOF_prev_21_22_std <- QOF_prev_cl %>%
-  filter(year >= 6)
-
 # performing ITS 
 itsa <- lm(obsprev ~ year + covid + year*covid, data = QOF_prev_cl)
 summary(itsa)
 
 ## Using Predict
-model <- lm(obsprev ~ year + as.factor(ccg_code) + year*as.factor(ccg_code), data = subset(QOF_prev_cl, year < 6))
+model <- lm(obsprev ~ year + as.factor(SICBL22CDH) + year*as.factor(SICBL22CDH), data = subset(QOF_prev_cl, year < 6))
 QOF_prev_21_22$predicted_prev <- predict(model, subset(QOF_prev_cl, year >=6))
 
 QOF_prev_21_22 <- QOF_prev_21_22 %>%
   mutate(prev_diff = obsprev-predicted_prev)
 
-### Coding CCG population ###
-lsoa_pop_from_GP <- GP_lsoa_dist %>%
-  group_by(lsoa_code) %>%
-  summarise(lsoa_pop = sum(number_of_patients))
-
-lsoa_ccg_pop_merge <- merge(lsoa_pop_from_GP, lsoa_ccg_la, by.x = 'lsoa_code', by.y = 'LSOA11CD')
-
-ccg_pop <- lsoa_ccg_pop_merge %>%
-  group_by(CCG21CD, CCG21CDH, CCG21NM) %>%
-  summarise(sub_icb_pop = sum(lsoa_pop))
-
-QOF_prev_pop <- merge(QOF_prev_21_22, ccg_pop, by.x = 'ccg_code', by.y = 'CCG21CDH') %>%
-  # Calculating undiagnosed absolute totals from extrapolated population
-  mutate(undiagnosed = round(prev_diff*sub_icb_pop/100, digits = 0), 
-         estimated = round(predicted_prev*(sub_icb_pop/100))) 
+QOF_prev_pop <- merge(QOF_prev_21_22, ics_population, by = 'SICBL22CDH') %>%
+  # Calculating missed absolute totals from extrapolated population
+  mutate(missed = round(prev_diff*population/100, digits = 0), 
+         estimated = round(predicted_prev*(population/100))) 
 
 # Finding Absolute Values in Differences
 missed_21 <- QOF_prev_pop %>%
@@ -368,15 +387,17 @@ missed_21 <- QOF_prev_pop %>%
   select(., -c(year, covid)) %>%
   rename(obs_prev_21 = obsprev, 
          prev_diff_21 = prev_diff,
-         missed_21 = undiagnosed)
+         missed_21 = missed, 
+         predicted_prev_21 = predicted_prev,
+         estimated_hypertension_pop_21 = estimated)
 
 top_decile_missed_ics <- missed_21 %>%
   mutate(decile = ntile(missed_21, 10)) %>%
   filter(decile == 1)
 
-top_decile_missed_ics_shp <- merge(Eng_CCG, top_decile_missed_ics, by = c('CCG21CD', 'CCG21NM'))
+top_decile_missed_ics_shp <- merge(Eng_ICS, top_decile_missed_ics, by = c('SICBL22CD', 'SICBL22NM'))
 
-tm_shape(Eng_CCG) + 
+tm_shape(Eng_ICS) + 
   tm_borders(col = "black") + 
   tm_shape(top_decile_missed_ics_shp) + 
   tm_fill(col = "#00a3c7", alpha = 0.5) + 
@@ -389,12 +410,14 @@ missed_22 <- QOF_prev_pop %>%
   select(., -c(year, covid)) %>%
   rename(obs_prev_22 = obsprev, 
          prev_diff_22 = prev_diff,
-         undiagnosed_22 = undiagnosed)
+         undiagnosed_22 = missed,
+         predicted_prev_22 = predicted_prev,
+         estimated_hypertension_pop_22 = estimated)
 
-missed_all <- merge(missed_21, missed_22, by = c("ccg_code", "CCG21CD", "CCG21NM", "sub_icb_pop"))
+missed_all <- inner_join(missed_21, missed_22)
 
 # plotting differences
-prev_diff_shp <- merge(Eng_CCG, QOF_prev_pop, by = c('CCG21CD', 'CCG21NM')) 
+prev_diff_shp <- merge(Eng_ICS, QOF_prev_pop, by = c('SICBL22CD', 'SICBL22NM')) 
 
 # 2021 difference
 tm_shape(prev_diff_shp) + 
@@ -411,17 +434,17 @@ tm_shape(prev_diff_shp) +
   tm_layout(main.title = 'Unreported Hypertension in the UK (2022)', legend.outside = TRUE) 
 
 # merge to regional data 
-abs_hyper_region <- full_join(missed_all, ccg_region)
+regional_missed <- full_join(missed_all, ics_region)
 
-ggplot(abs_hyper_region, aes(x = NHSER21NM, y = missed_21, fill = CCG21NM)) + 
+ggplot(regional_missed, aes(x = NHSER22NM, y = missed_21, fill = SICBL22NM)) + 
   geom_col() +
   labs(x = "Region", y = "Missed Diagnoses", title = "Missed Diagnoses by Region") +
   #  scale_fill_brewer() + 
-  stat_summary(fun = sum, aes(label = format(..y.., digits = 5), group = NHSER21NM), geom = "text") +
+  stat_summary(fun = sum, aes(label = format(..y.., digits = 5), group = NHSER22NM), geom = "text") +
   theme(legend.position = "none")
 
 # Find Regional values 
-regional_totals <- abs_hyper_region %>%
-  group_by(NHSER21NM) %>%
+regional_totals <- regional_missed %>%
+  group_by(NHSER22NM) %>%
   summarise(missed_diagnoses_total = round(sum(missed_21), 0), 
-            region_pop = sum(sub_icb_pop))
+            region_pop = sum(population))

@@ -17,7 +17,13 @@ GP_lsoa_data <- read_csv("GP LSOA Distribution Data.csv")
 GP_age_dist_cl <- read_csv("Cleaned GP Age Distribution.csv")
 
 # QOF Data 
-Hyper21_22cl <- read_csv("QOF Data 2021_22.csv")
+Hyper21_22_cl <- read_csv("QOF Data 2021_22.csv")
+
+# Lookup File
+ics_region <- read_csv("~/Lookup Files/Sub_ICB_Locations_to_ICB_to_NHS_England_(Region)_(July_2022)_Lookup.csv") %>%
+  select(-ObjectId)
+
+ics_population <- read_csv("ICS Population.csv")
 
 # ICS Shapefile
 Eng_ICS <- st_read("~/Shapefiles/Sub-ICB Shapefiles/SICBL_JUL_2022_EN_BUC.shp")
@@ -32,7 +38,7 @@ lsoa_region <- read_csv("LSOA to Region Lookup File.csv")
 #### Objective 2 ####
 # Comparing QOF Prevalence to HSE Prevalence by GP 
 # Loading in HSE GP Prevalence data 
-hse_hyp_prev <- read_csv("hypertension_prevalence_estimate_HSE.csv") %>%
+hse_hyp_prev <- read_csv("~/Hypertension/hypertension_prevalence_estimate_HSE.csv") %>%
   clean_names()
 
 # Age Standardising HSE data 
@@ -44,23 +50,25 @@ hse_hypertension_prev <- merge(GP_age_dist_cl, hse_hyp_prev, by.x = 'org_code', 
 hse_qof_comparison <- merge(hse_hyp_prev, Hyper21_22_cl, by.x = 'code', by.y = 'practice_code')
 
 # finding difference in crude prevalence 
-undiagnosed_hypertension_prev <- hse_qof_comp %>%
+gp_undiagnosed_hypertension_prev <- hse_qof_comparison %>%
   mutate(undiagnosed_hyp = percent - prevalence_percent_21_22) %>%
   rename(hse_prevalence = percent, 
          practice_code = code)
+# Rename the three ICS with "Isle" so there are no difficulties with merging
+gp_undiagnosed_hypertension_prev$sub_icb_loc_name <- gsub("NHS Cornwall and The Isles Of Scilly ICB - 11N", 
+                                                          "NHS Cornwall and the Isles of Scilly ICB - 11N", gp_undiagnosed_hypertension_prev$sub_icb_loc_name)
+gp_undiagnosed_hypertension_prev$sub_icb_loc_name <- gsub("NHS Hampshire and Isle Of Wight ICB - 10R",
+                                                          "NHS Hampshire and Isle of Wight ICB - 10R", gp_undiagnosed_hypertension_prev$sub_icb_loc_name)
+gp_undiagnosed_hypertension_prev$sub_icb_loc_name <- gsub("NHS Hampshire and Isle Of Wight ICB - D9Y0V", 
+                                                          "NHS Hampshire and Isle of Wight ICB - D9Y0V", gp_undiagnosed_hypertension_prev$sub_icb_loc_name)
 
 # finding absolute prevalence at GP level 
-gp_undiagnosed_hypertension <- merge(undiagnosed_hypertension_prev, GP_lsoa_data, by = 'practice_code') %>%
-  # selecting variables of interest 
-  select(practice_code, practice_name, number_of_patients, hse_prevalence, prevalence_percent_21_22, undiagnosed_hyp,
-         lsoa_code, lsoa_pop, sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
-  # Calculating total undiagnosed by GP 
+lsoa_undiagnosed_hypertension <- merge(gp_undiagnosed_hypertension_prev, GP_lsoa_data, by = 'practice_code') %>%
+ # Calculating total undiagnosed by GP 
   mutate(undiagnosed_totals = (undiagnosed_hyp/100)*number_of_patients, 
          undiagnosed_v2 = number_of_patients*0.1125633,
-         gp_coverage = number_of_patients/lsoa_pop)
-
-# Aggregating at LSOA level 
-lsoa_undiagnosed_hypertension <- gp_undiagnosed_hypertension %>%
+         gp_coverage = number_of_patients/lsoa_pop) %>%
+  # Aggregating at LSOA level
   group_by(lsoa_code) %>%
   summarise(undiagnosed_prev = sum(gp_coverage*undiagnosed_hyp, na.rm = TRUE), 
             hypertension_prev = sum(gp_coverage*prevalence_percent_21_22, na.rm = T),
@@ -69,25 +77,22 @@ lsoa_undiagnosed_hypertension <- gp_undiagnosed_hypertension %>%
          undiagnosed_v2 = round(0.1125633*lsoa_pop), 
          hypertension_cases = round(hypertension_prev*lsoa_pop/100))
 
-abs_undiagnosed_lsoa_ccg <- merge(abs_undiagnosed_lsoa, lsoa_ccg_pop_merge, by = c('lsoa_code', 'lsoa_pop')) %>%
-  select(-c(FID, LAD21CD, LAD21NM))
-
-abs_undiagnosed_lsoa_region <- merge(abs_undiagnosed_lsoa_ccg, ccg_region, by = c('CCG21NM', 'CCG21CD', 'CCG21CDH'))
-
 # Aggregating at ICS level
-sub_icb_undiagnosed_hypertension <- gp_undiagnosed_hypertension %>%
+sub_icb_undiagnosed_hypertension <- gp_undiagnosed_hypertension_prev %>%
   group_by(sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
-  summarise(undiagnosed_hypertension = round(sum(undiagnosed_totals, na.rm = TRUE),digits = 0),
-            sub_icb_pop = sum(number_of_patients)) %>%
-  ungroup()
+  summarise(undiagnosed_hypertension = round(sum(undiagnosed_hyp*register_21_22, na.rm = TRUE),digits = 0)) %>%
+  ungroup() %>%
+  merge(., ics_population, by.x = c("sub_icb_loc_ons_code", "sub_icb_loc_name", "sub_icb_loc_ods_code"), 
+        by.y = c("SICBL22CD", "SICBL22NM", "SICBL22CDH"))
 
 top_decile_undiagnosed_ics <-  sub_icb_undiagnosed_hypertension %>%
   mutate(decile = ntile(undiagnosed_hypertension, 10)) %>%
   filter(decile == 10)
 
 # plotting on a map 
-top_decile_undiagnosed_ics_shp <- merge(Eng_ICS, top_decile_undiagnosed_ics, by.x = 'SICBL22CD', 
-                                        by.y = 'sub_icb_loc_ons_code')
+top_decile_undiagnosed_ics_shp <- merge(Eng_ICS, top_decile_undiagnosed_ics, 
+                                        by.x = c('SICBL22CD','SICBL22NM'), 
+                                        by.y = c('sub_icb_loc_ons_code', 'sub_icb_loc_name'))
 
 tm_shape(Eng_ICS) + 
   tm_borders(col = "black") + 
@@ -98,10 +103,11 @@ tm_shape(Eng_ICS) +
   tm_scale_bar(position = c("right", "bottom"))
 
 # Aggregating at Regional Level
-regional_abs_undiagnosed <- merge(sub_icb_abs, ccg_region, by.x = 'sub_icb_loc_ods_code', by.y = 'SICBL22CDH') %>%
-  group_by(NHSER21NM, NHSER21CD) %>%
+regional_undiagnosed <- merge(sub_icb_undiagnosed_hypertension, ics_region, 
+                              by.x = c('sub_icb_loc_ons_code', 'sub_icb_loc_name', 'sub_icb_loc_ods_code'),
+                              by.y = c('SICBL22CD', 'SICBL22NM', 'SICBL22CDH')) %>%
+  group_by(NHSER22NM, NHSER22CD) %>%
   summarise(tot_undiagnosed = sum(undiagnosed_hypertension), 
-            undiagnosed_v2 = sum(undiagnosed_v2),
             region_population = sum(sub_icb_pop)) %>%
   mutate(rate_per_100000 = round(tot_undiagnosed/(region_population/100000), digits = 2), 
          undiagnosed_prev = round(tot_undiagnosed/region_population*100, digits = 2))
