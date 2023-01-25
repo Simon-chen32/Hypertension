@@ -24,7 +24,6 @@ Eng_ICS$SICBL22NM <- gsub("NHS Hampshire and Isle Of Wight ICB - D9Y0V", "NHS Ha
 ENG_LSOA11 <- st_read("~/Shapefiles/LSOA (2011) Shapefiles/infuse_lsoa_lyr_2011.shp") %>% 
   filter(str_detect(geo_code, '^E'))
 
-
 # Looking into Number of Uncontrolled cases of Hypertension 
 # Load in LSOA level data from GP's Analysis
 # Start by Calculating the weighted achievement and intervention rates at GP level 
@@ -53,6 +52,27 @@ lsoa_treatment <- gp_to_lsoa_hypertension_prev %>%
          untreated_pop = round(untreated_100perc*(lsoa_pop*hypertension_prev/100)/100), 
          preventable_strokes = floor(untreated_pop80/67), 
          preventable_mi = floor(untreated_pop80/118))
+
+ics_treatment_data <- gp_to_lsoa_hypertension_prev %>%
+  group_by(sub_icb_loc_ons_code, sub_icb_loc_name, sub_icb_loc_ods_code) %>%
+  summarise(ics_pop = sum(number_of_patients), 
+            hypertension_prev = sum(prevalence_percent_21_22*(number_of_patients/ics_pop)),
+            treated_under80_percent = round(sum((number_of_patients/ics_pop)*under79_achievement_net_exceptions_21_22, na.rm = T), digits = 2), 
+            treated_over80_percent = round(sum((number_of_patients/ics_pop)*over80_achievement_net_exceptions_21_22, na.rm = T), digits = 2), 
+            under80_rate = sum((number_of_patients/ics_pop)*(under79_21_22/list_size_21_22)),
+            all_treated_percent = round(sum(under80_rate*treated_under80_percent + (1-under80_rate)*treated_over80_percent), digits = 2)) %>%
+  mutate(untreated_perc_under80 = 100 - treated_under80_percent, 
+         untreated_perc_over80 = 100 - treated_over80_percent, 
+         untreated_80perc = 80 - all_treated_percent,
+         untreated_100perc = 100 - all_treated_percent, 
+         untreated_pop80 = round(untreated_80perc*(ics_pop*(hypertension_prev/100))/100),
+         untreated_pop = round(untreated_100perc*(ics_pop*hypertension_prev/100)/100), 
+         preventable_strokes = floor(untreated_pop80/67), 
+         preventable_mi = floor(untreated_pop80/118),
+         total_costs_stroke_per_yr = (preventable_strokes)*(50850.72/5), 
+         total_costs_mi_per_yr = (preventable_mi)*2052.12,
+         hypertension_costs = (untreated_pop80)*161.67, 
+         costs_saved = round(total_costs_stroke_per_yr+total_costs_mi_per_yr-hypertension_costs, 2))
 
 lsoa_untreated_quintile <- lsoa_treatment %>%
   mutate(uncontrolled_quintile = ntile(untreated_80perc, 5)) %>%
@@ -510,8 +530,8 @@ regional_costs$NHSER21NM <- factor(regional_costs$NHSER21NM, levels = regional_c
 # Costs by ICS 
 ics_total_costs <- ics_treatment_data[order(ics_treatment_data$costs_saved, decreasing = T), ]
 
-ics_total_costs$SICBL22NM <- factor(ics_total_costs$SICBL22NM, 
-                                    levels = ics_total_costs$SICBL22NM)
+ics_total_costs$sub_icb_loc_name <- factor(ics_total_costs$sub_icb_loc_name, 
+                                    levels = ics_total_costs$sub_icb_loc_name)
 # Creating Cumulative Sum of Costs Saved
 ics_total_costs$cumulative <- cumsum(ics_total_costs$costs_saved) 
 # Converting Cumulative Sum to a Percentage
@@ -519,7 +539,7 @@ ics_total_costs$cumulative <- 100 * ics_total_costs$cumulative/tail(ics_total_co
 # Adjusting Right Hand Scale
 scaleRight_Totalcosts <- tail(ics_total_costs$cumulative, n = 1)/head(ics_total_costs$costs_saved, n = 1)
 
-ggplot(ics_total_costs, aes(x = SICBL22NM)) +
+ggplot(ics_total_costs, aes(x = sub_icb_loc_name)) +
   geom_bar(aes(y = costs_saved/1000), fill = "#00a3c7", stat = "identity") + 
   geom_path(aes(y = cumulative/scaleRight_Totalcosts/1000, group = 1), color = "red") + 
   geom_point(aes(y = cumulative/scaleRight_Totalcosts/1000, group = 1), color = 'black') + 
