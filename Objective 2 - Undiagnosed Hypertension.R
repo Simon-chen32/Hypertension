@@ -39,21 +39,22 @@ lsoa_region <- read_csv("LSOA to Region Lookup File.csv")
 # Comparing QOF Prevalence to HSE Prevalence by GP 
 # Loading in HSE GP Prevalence data 
 hse_hyp_prev <- read_csv("~/Hypertension/hypertension_prevalence_estimate_HSE.csv") %>%
-  clean_names()
-
-# Age Standardising HSE data 
-hse_hypertension_prev <- merge(GP_age_dist_cl, hse_hyp_prev, by.x = 'org_code', by.y = 'code') %>%
-  # Create new column for the percentage of patients a GP serves in each LSOA 
-  mutate(hse_exp_hyp = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100)
-
-# merging to QOF data from 21/22
-hse_qof_comparison <- merge(hse_hyp_prev, Hyper21_22_cl, by.x = 'code', by.y = 'practice_code')
-
-# finding difference in crude prevalence 
-gp_undiagnosed_hypertension_prev <- hse_qof_comparison %>%
-  mutate(undiagnosed_hyp = percent - prevalence_percent_21_22) %>%
+  clean_names() %>%
   rename(hse_prevalence = percent, 
          practice_code = code)
+
+# Age Standardising HSE data 
+hse_hypertension_prev <- merge(GP_age_dist_cl, hse_hyp_prev, by.x = 'org_code', by.y = 'practice_code') %>%
+  # Create new column for the percentage of patients a GP serves in each LSOA 
+  mutate(hse_exp_hyp = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100) 
+
+# merging to QOF data from 21/22
+hse_qof_comparison <- merge(hse_hyp_prev, Hyper21_22_cl, by = 'practice_code') 
+
+# finding difference in crude prevalence 
+gp_undiagnosed_hypertension_prev <- merge(hse_qof_comparison, GP_lsoa_data, by = 'practice_code') %>%
+  mutate(undiagnosed_hyp = hse_prevalence - prevalence_percent_21_22, 
+         undiagnosed_patients = (undiagnosed_hyp/100)*number_of_patients) 
 # Rename the three ICS with "Isle" so there are no difficulties with merging
 gp_undiagnosed_hypertension_prev$sub_icb_loc_name <- gsub("NHS Cornwall and The Isles Of Scilly ICB - 11N", 
                                                           "NHS Cornwall and the Isles of Scilly ICB - 11N", gp_undiagnosed_hypertension_prev$sub_icb_loc_name)
@@ -63,27 +64,23 @@ gp_undiagnosed_hypertension_prev$sub_icb_loc_name <- gsub("NHS Hampshire and Isl
                                                           "NHS Hampshire and Isle of Wight ICB - D9Y0V", gp_undiagnosed_hypertension_prev$sub_icb_loc_name)
 
 # finding absolute prevalence at GP level 
-lsoa_undiagnosed_hypertension <- merge(gp_undiagnosed_hypertension_prev, GP_lsoa_data, by = 'practice_code') %>%
+lsoa_undiagnosed_hypertension <- gp_undiagnosed_hypertension_prev %>%
  # Calculating total undiagnosed by GP 
-  mutate(undiagnosed_totals = (undiagnosed_hyp/100)*number_of_patients, 
-         undiagnosed_v2 = number_of_patients*0.1125633,
-         gp_coverage = number_of_patients/lsoa_pop) %>%
+  mutate(gp_coverage = number_of_patients/lsoa_pop) %>%
   # Aggregating at LSOA level
   group_by(lsoa_code) %>%
   summarise(undiagnosed_prev = sum(gp_coverage*undiagnosed_hyp, na.rm = TRUE), 
             hypertension_prev = sum(gp_coverage*prevalence_percent_21_22, na.rm = T),
             lsoa_pop = mean(lsoa_pop)) %>%
   mutate(undiagnosed = round(undiagnosed_prev*lsoa_pop/100), 
-         undiagnosed_v2 = round(0.1125633*lsoa_pop), 
          hypertension_cases = round(hypertension_prev*lsoa_pop/100))
 
 # Aggregating at ICS level
 sub_icb_undiagnosed_hypertension <- gp_undiagnosed_hypertension_prev %>%
   group_by(sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
-  summarise(undiagnosed_hypertension = round(sum(undiagnosed_hyp*register_21_22, na.rm = TRUE),digits = 0)) %>%
-  ungroup() %>%
-  merge(., ics_population, by.x = c("sub_icb_loc_ons_code", "sub_icb_loc_name", "sub_icb_loc_ods_code"), 
-        by.y = c("SICBL22CD", "SICBL22NM", "SICBL22CDH"))
+  summarise(undiagnosed_hypertension = round(sum(undiagnosed_patients, na.rm = T),digits = 0), 
+            population = sum(number_of_patients), 
+            undiagnosed_rate = round(undiagnosed_hypertension/population*100, digits = 2))
 
 top_decile_undiagnosed_ics <-  sub_icb_undiagnosed_hypertension %>%
   mutate(decile = ntile(undiagnosed_hypertension, 10)) %>%
@@ -108,9 +105,14 @@ regional_undiagnosed <- merge(sub_icb_undiagnosed_hypertension, ics_region,
                               by.y = c('SICBL22CD', 'SICBL22NM', 'SICBL22CDH')) %>%
   group_by(NHSER22NM, NHSER22CD) %>%
   summarise(tot_undiagnosed = sum(undiagnosed_hypertension), 
-            region_population = sum(sub_icb_pop)) %>%
+            region_population = sum(population)) %>%
   mutate(rate_per_100000 = round(tot_undiagnosed/(region_population/100000), digits = 2), 
          undiagnosed_prev = round(tot_undiagnosed/region_population*100, digits = 2))
 
 # Mean HSE England percentage is 25.58151
 # Subtract from QOF average of 14.32518 to get 11.25633 Undiagnosed 
+
+# Exporting Data
+write_csv(lsoa_undiagnosed_hypertension, "LSOA Undiagnosed Hypertension.csv")
+write_csv(sub_icb_undiagnosed_hypertension, "ICS Undiagnosed Hypertension.csv")
+write_csv(regional_undiagnosed, "Undiagnosed Hypertension by Region.csv")
