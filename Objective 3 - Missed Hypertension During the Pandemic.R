@@ -448,3 +448,7 @@ regional_totals <- regional_missed %>%
   group_by(NHSER22NM) %>%
   summarise(missed_diagnoses_total = round(sum(missed_21), 0), 
             region_pop = sum(population))
+
+################################# Exporting Data ###############################
+write_csv(missed_all, "Missed Hypertension Cases by ICS.csv")
+write_csv(regional_totals, "Missed Hypertension Cases by Region.csv")
