@@ -1,3 +1,6 @@
+# set working directory 
+setwd("C:/Users/SIMC/Lane Clark & Peacock LLP/CVD PRA Programme - LCP WGs - 03 Secondary prevention/Analysis")
+
 #### Installing Packages ####
 library(tidyverse)
 library(tmap)
@@ -9,9 +12,6 @@ library(RColorBrewer)
 library(ggQC)
 library(scales)
 library(waterfalls)
-
-# set working directory 
-setwd("C:/Users/SIMC/Lane Clark & Peacock LLP/CVD PRA Programme - LCP WGs - 03 Secondary prevention/Analysis")
 
 #### Objective 4 ####
 # Loading in Shapefile
@@ -171,17 +171,18 @@ ggplot(regional_undiagnosed_cvd_event_long, aes(x = NHSER22NM, y = excess,
 ###
 
 # Decile Analysis 
-decile_cumulative <- lsoa_undiagnosed %>%
-  group_by(obs_decile) %>%
+decile_by_hypertension_rate <- lsoa_undiagnosed_hypertension %>%
+  mutate(hypertension_decile = ntile(hypertension_prev, 10)) %>%
+  mutate(across(hypertension_decile, as_factor)) %>%
+  group_by(hypertension_decile) %>%
   summarise(undiagnosed = sum(undiagnosed), 
             undiagnosed_hse_crude = sum(undiagnosed_v2),
             population = sum(lsoa_pop),
-            hypertension_pop = sum(hypertension_cases), 
-            undiagnosed_NCD = (undiagnosed*0.369)/0.631) %>%
+            average_prevalence = round(sum((lsoa_pop/population)*hypertension_prev),2),
+            undiagnosed_rate = round(sum((lsoa_pop/population)*undiagnosed_prev),2),
+            hypertension_population = sum(hypertension_cases)) %>%
   mutate(excess_stroke = floor(undiagnosed/67),
-         excess_stroke_v2 = floor(undiagnosed_hse_crude/67), 
          excess_mi = floor(undiagnosed/118), 
-         excess_mi_v2 = floor(undiagnosed_hse_crude/118),
          undiagnosed_per_100000 = round(undiagnosed/(population/100000), digits = 2))
 
 undiagnosed_hypertension_decile <- lsoa_undiagnosed_hypertension %>%
@@ -202,9 +203,9 @@ undiagnosed_hypertension_decile <- lsoa_undiagnosed_hypertension %>%
          costs_saved = total_costs_stroke_per_yr + total_costs_mi_per_yr-hypertension_costs) 
 
 # Plotting of Results 
-ggplot(decile_cumulative, aes(x = obs_decile, fill = obs_decile)) +
+ggplot(decile_by_hypertension_rate, aes(x = hypertension_decile, fill = hypertension_decile)) +
   scale_fill_manual(values = c("#fcdadb", "#f5c2c3", "#efaaaa", "#e89192", "#e2797a", "#db6161", "#d54949", "#ce3031", "#c81818", "#c10000")) + 
-  geom_col(aes(y = hypertension_pop/1000)) +
+  geom_col(aes(y = hypertension_population/1000)) +
   geom_point(aes(y = undiagnosed/1000), size = 3) +
   geom_path(aes(y = undiagnosed/1000, group = 1)) +
   labs(title = "Hypertension Population Distribution", x = "Hypertension Prevalence Decile", 
@@ -522,10 +523,6 @@ regional_treatment_prev <- merge(lsoa_treatment, lsoa_region, by.x = "lsoa_code"
          ambulance_stroke = floor(prevented_strokes*0.755), 
          hospital_days_stroke = floor(prevented_strokes*22.2), 
          admissions_total = floor(prevented_strokes+prevented_mi))
-
-regional_costs <- regional_treatment_prev[order(regional_treatment_prev$costs_saved,decreasing = T), ]
-
-regional_costs$NHSER21NM <- factor(regional_costs$NHSER21NM, levels = regional_costs$NHSER21NM)
 
 # Costs by ICS 
 ics_total_costs <- ics_treatment_data[order(ics_treatment_data$costs_saved, decreasing = T), ]
