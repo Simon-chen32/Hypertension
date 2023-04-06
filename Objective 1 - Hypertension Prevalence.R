@@ -3,12 +3,16 @@ setwd("C:/Users/SIMC/Lane Clark & Peacock LLP/CVD PRA Programme - LCP WGs - 03 C
 
 #### Installing Packages ####
 library(tidyverse)
+library(gt)
+library(gtExtras)
 library(tmap)
 library(sf)
 library(janitor)
-library(stringr)
 library(ggplot2)
+library(ggpubr)
+library(gridExtra)
 
+lcp_blue_to_red <- c("#002f5f", "#345c80", "#627e9b",  "#8da8ad", "#c1d3d6", "#fcdadb", "#f595a3", "#e93f6f", "#821a4d")
 
 #### Loading Data #####
 # Loading in Shapefile
@@ -164,12 +168,16 @@ Hyper21_22_cl <- Hyper21_22 %>%
                        over80_numerator_21_22, over80_denominator_21_22, over80_achievement_net_exceptions_21_22,
                        over80_percent_receiving_intervention_21_22)) %>%
   mutate(over80_prev = over80_denominator_21_22/over80_21_22, 
-         under79_prev = under79_denominator_21_22/under79_21_22)
+         under79_prev = under79_denominator_21_22/under79_21_22) %>%
+  filter(over80_achievement_net_exceptions_21_22 != ":")
 
 Hyper21_22_cl$over80_achievement_net_exceptions_21_22 <- as.numeric(Hyper21_22_cl$over80_achievement_net_exceptions_21_22)
 Hyper21_22_cl$over80_percent_receiving_intervention_21_22 <- as.numeric(Hyper21_22_cl$over80_percent_receiving_intervention_21_22)
 
 GP_lsoa_age_data <- merge(GP_age_dist_cl, GP_lsoa_data, by.x = 'org_code', by.y = 'practice_code')
+
+
+sum(is.na(Hyper21_22_cl$over80_achievement_net_exceptions_21_22))
 
 lsoa_hypertension_prev <- merge(GP_lsoa_age_data, Hyper21_22_cl, by.x = 'org_code', by.y = 'practice_code') %>%
   # Create new column for the percentage of patients a GP serves in each LSOA 
@@ -178,44 +186,9 @@ lsoa_hypertension_prev <- merge(GP_lsoa_age_data, Hyper21_22_cl, by.x = 'org_cod
          tot_o80 = (number_of_patients/all_all)*total80plus,
          exp_hyp = (exp_hyp_male*perc_male + exp_hyp_female*perc_female)*100, 
          exp_u79_hyp = (exp_u79_hyp_male*male_u79_perc + exp_u79_hyp_female*female_u79_perc)*100)
-
-
-##### GP Coverage Analysis ###########
-gp_coverage_rate <- lsoa_hypertension_prev %>%
-  select(org_code, lsoa_code, lsoa_pop, number_of_patients, practice_name, 
-         gp_coverage, prevalence_percent_21_22, exp_hyp)
-
-gp_cov90 <- gp_coverage %>%
-  filter(gp_coverage >= 0.9)
-
-lsoa_med_age <- read_csv("~/Hypertension/Population Age Distributions/lsoa_median_age.csv", skip = 4) %>%
-  clean_names()
-
-gp_cov90_age_dist <- merge(gp_cov90, lsoa_med_age, by = 'lsoa_code') %>%
-  select_if(~ !any(is.na(.))) %>%
-  select(-c(la_code_2018_boundaries:la_name_2021_boundaries)) %>%
-  get_dupes(practice_name)
-
-diff_5plus <- gp_cov90_age_dist %>%
-  mutate(age_diff = median_age - lead(median_age)) 
-
-diff_filtered <- diff_5plus %>%
-  filter(age_diff <= -5 & practice_name == lead(practice_name) | 
-           age_diff >= 5 & practice_name == lead(practice_name)) 
-
-diff_10plus <- diff_5plus %>%
-  filter(age_diff <= -10 & practice_name == lead(practice_name) | 
-           age_diff >= 10 & practice_name == lead(practice_name)) 
-
-exp_diff5plus <- merge(diff_10plus, lsoa_age_dist_5yr, by = c('lsoa_code', 'lsoa_name')) %>%
-  select(-c(age0_15:age75plus_perc, starts_with('la'))) %>%
-  mutate(exp_diff = exp_hyp - exp_hyp_no_sex*100) %>%
-  filter(exp_diff <= -5 | exp_diff >= 5)
-
-obs_diff5plus <-  merge(diff_10plus, lsoa_age_dist_5yr, by = c('lsoa_code', 'lsoa_name')) %>%
-  select(-c(age0_15:age75plus_perc, starts_with('la'))) %>%
-  mutate(obs_diff = prevalence_percent_21_22 - exp_hyp_no_sex*100) %>%
-  filter(obs_diff <= -5 | obs_diff >= 5)
+n_distinct(lsoa_hypertension_prev$sub_icb_loc_name)
+n_distinct(lsoa_hypertension_prev$sub_icb_loc_ods_code)
+n_distinct(lsoa_hypertension_prev$sub_icb_loc_ons_code)
 
 ################################# Hypertension Analysis ###############################################
 # checking the mean and median of hypertension prevalence by GP 
@@ -242,10 +215,39 @@ lsoa_age_adj <- lsoa_grouped %>%
   mutate(obs_over_exp = obs_hyper_prev/exp_hyper_prev,
          u79_obs_over_exp = obs_u79_prev/exp_u79_prev,
          age_std_prev = mean(obs_hyper_prev)*obs_over_exp, 
-         age_std_u79_prev = mean(obs_u79_prev)*u79_obs_over_exp)
+         age_std_u79_prev = mean(obs_u79_prev)*u79_obs_over_exp, 
+         hypertension_cases = round((age_std_prev/100)*lsoa_pop)) 
 
-# Merging at CCG 
-ics_grouped <- merge(lsoa_age_adj, lsoa_ics, by.x = 'lsoa_code', by.y = 'LSOA11CD') 
+lsoa_hypertension_imd <- merge(lsoa_age_adj, LSOA_imd_cl, by.x = 'lsoa_code', by.y = 'lsoa_code_2011') 
+
+lsoa_hypertension_imd_decile <- lsoa_hypertension_imd %>%
+  mutate(across(imd_decile, as_factor)) %>%
+  group_by(imd_decile) %>%
+  summarise(population = sum(lsoa_pop), 
+            hypertension_pop = sum(hypertension_cases),
+            alternative_prev = mean(age_std_prev),
+            age_std_prevalence = sum((lsoa_pop/population)*age_std_prev)) 
+
+ggplot(lsoa_hypertension_imd_decile, aes(x = imd_decile, fill = imd_decile)) +
+  scale_fill_manual(values = c("#fcdadb", "#f5c2c3", "#efaaaa", "#e89192", "#e2797a", "#db6161", "#d54949", "#ce3031", "#c81818", "#c10000")) + 
+  geom_col(aes(y = age_std_prevalence)) +
+  labs(x = "IMD Decile (1 is Most Deprived)", 
+       y = "Age Standardised Prevalence") +
+  scale_y_continuous(expand = c(0,0)) +
+  theme(axis.text = element_text(size = 14), 
+        axis.title = element_text(size = 20),
+        panel.background = element_blank(), 
+        panel.grid.major =  element_blank(), 
+        axis.line = element_line(colour = "black"), 
+        legend.position = "none") 
+
+hypertension_imd <- lm(age_std_prev ~ imd_decile, data = lsoa_hypertension_imd)
+summary(hypertension_imd)
+
+# Merging at ICS and ranking 
+ics_grouped <- merge(lsoa_age_adj, lsoa_ics, by.x = 'lsoa_code', by.y = 'LSOA11CD') %>%
+  group_by(SICBL22CD, SICBL22NM, SICBL22CDH) %>%
+  mutate(age_std_prev_rank = rank(age_std_prev, ties.method = "min")) 
 
 # comparing mean and median in new df to data reported by GPs 
 mean(lsoa_grouped$obs_hyper_prev) # 14.30%
@@ -267,7 +269,7 @@ national_age_std_prev <- tm_shape(hypertension_prev_shp) +
   tm_layout(main.title = "Age Standardised Hypertension Prevalence Rate", legend.outside = TRUE)
 
 # removing Ealing
-hyper_prev_no_ealing <- hyper_prev_shp %>%
+hyper_prev_no_ealing <- hypertension_prev_shp %>%
   filter(!grepl('Ealing', name))
 
 # Plot at CCG Level 
@@ -280,55 +282,187 @@ shp_df <- inner_join(inter_ics_lsoa_borders, ics_region) %>%
 # separate file that aggregates the data
 ics_hypertension_prev <- ics_grouped %>%
   group_by(SICBL22CD, SICBL22NM, SICBL22CDH) %>%
-  summarise(avg_prevalence_21_22 = mean(obs_hyper_prev), 
+  summarise(population = sum(lsoa_pop),
+            avg_prevalence_21_22 = sum(obs_hyper_prev*(lsoa_pop/population)), 
             exp_hyp_21_22 = mean(exp_hyper_prev), 
             obs_over_exp_22 = mean(obs_over_exp), 
-            age_std_prev_21_22 = mean(age_std_prev),
-            lsoa_pop_21_22 = sum(lsoa_pop),
+            age_std_prev_21_22 = sum(age_std_prev*(lsoa_pop/population)),
             avg_u79_achievement_21_22 = mean(u79_achievement), 
             avg_u79_intervention_21_22 = mean(u79_intervention), 
             avg_o80_achievement_21_22 = mean(o80_achievement), 
-            avg_o80_intervention_21_22 = mean(o80_intervention)) 
+            avg_o80_intervention_21_22 = mean(o80_intervention)) %>%
+  ungroup() %>%
+  mutate(age_std_prev_rank = rank(age_std_prev_21_22, ties.method = "min")) # 1 is Lowest Prevalence
 
-ics_hypertension_shp <- merge(ics_borders, ics_hypertension_prev, by = c('SICBL22CD', 'SICBL22NM'))
+regional_hypertension_prev <- inner_join(ics_hypertension_prev, ics_region) %>%
+  group_by(NHSER22NM, NHSER22CDH) %>%
+  summarise(region_pop = sum(population), 
+            hypertension_prev_21_22 = sum((population/region_pop)*avg_prevalence_21_22), 
+            age_std_prev_21_22 = sum((population/region_pop)*age_std_prev_21_22))
+  
+
+ics_hypertension_shp <- merge(ics_borders, ics_hypertension_prev, by = c('SICBL22CD', 'SICBL22NM', 'SICBL22CDH'))
+
+# Creating Table and Plot for Top 25 LSOAs by Hypertension
+top25_lsoa <- ics_grouped %>%
+  filter(age_std_prev > 20.86) %>%
+  ungroup() %>%
+  select(-c(obs_u79_prev:u79_obs_over_exp, age_std_u79_prev))
+
+top25_lsoa_table <- top25_lsoa %>%
+  select(SICBL22NM, LSOA11NM, age_std_prev) %>%
+  arrange(SICBL22NM, desc(age_std_prev)) %>%
+  gt(groupname_col = "SICBL22NM", rowname_col = "LSOA11NM") %>%
+  tab_style(style = cell_text(align = "left", indent = px(25)), locations = cells_stub()) %>%
+  fmt_percent(columns = c(age_std_prev), decimals = 2, scale_values = F) %>%
+  tab_header(title = "Top 25 Highest Prevalence LSOAs") %>%
+  gt_theme_538() %>%
+  cols_label(SICBL22NM = "ICS", 
+             LSOA11NM = "LSOA Name", 
+             age_std_prev = "Age Standardised Prevalence")
+top25_lsoa_table
+
+top25_lsoa_prev <- ics_grouped %>%
+  arrange(age_std_prev) %>%
+  tail(25) %>%
+  ungroup() %>%
+  select(SICBL22NM, LSOA11NM, age_std_prev) 
+
+top25_lsoa_table %>% gtsave('Top 25 LSOA Hypertension Rates.png')
+
+bottom25_lsoa_prev <- ics_grouped %>%
+  arrange(age_std_prev) %>%
+  head(25) %>%
+  ungroup() %>%
+  select(SICBL22NM, LSOA11NM, age_std_prev)
+  
+bottom25_lsoa_prev_table <- bottom25_lsoa_prev %>%
+  arrange(SICBL22NM, age_std_prev) %>%
+  gt(groupname_col = "SICBL22NM", rowname_col = "LSOA11NM") %>%
+  tab_style(style = cell_text(align = "left", indent = px(25)), locations = cells_stub()) %>%
+  fmt_percent(columns = c(age_std_prev), decimals = 2, scale_values = F) %>%
+  tab_header(title = "Top 25 Highest Prevalence LSOAs") %>%
+  gt_theme_538() %>%
+  cols_label(SICBL22NM = "ICS", 
+             LSOA11NM = "LSOA Name", 
+             age_std_prev = "Age Standardised Prevalence")
+bottom25_lsoa_prev_table
+
+write_csv(top25_lsoa_prev, "Highest Age-Standardised Hypertension Prevalence LSOAs.csv")
+write_csv(bottom25_lsoa_prev, "Lowest Age-Standardised Hypertension Prevalence LSOAs.csv")
+
+top25_lsoa_shp <- inner_join(Eng_ICS, top25_lsoa)
+top25_lsoa_map <- tm_shape(Eng_ICS) + 
+  tm_borders(col = "black", alpha = 1) +
+  tm_shape(top25_lsoa_shp) + 
+  tm_graticules(alpha = 0.1, lines = F) +
+  tm_fill(col = "#f2748c", alpha = 0.8) +
+  tm_compass(position = c("left", "top")) + 
+  tm_scale_bar() + 
+  tm_layout(frame = F) 
+top25_lsoa_map
+
+par(mfrow = c(1,2))
+top25_lsoa_table
+top25_lsoa_map
+
+jpeg("Top 25 Highest Hypertension Prevalence LSOA.jpeg", width = 1400, height= 1200, res = 300)
+print(top25_lsoa_map)
+dev.off()
+
+# Plot ICS Distribution  
+hypertension_prev21_map <- tm_shape(ics_hypertension_shp) + 
+  tm_polygons(col = "age_std_prev_21_22", palette =lcp_blue_to_red, title = "A) ii) Age Std. Hypertension Prevalence (2021)", 
+              breaks = c(-Inf, 14, 14.5, 15, 15.5, 16, 16.5, Inf), 
+              labels = c("Less than 14%", "14 to 14.5%", "14.5 to 15%", "15 to 15.5%", 
+                         "15.5 to 16%", "16 to 16.5%", "More than 16.5%")) +
+  tm_compass(position = c("right", "top")) + 
+  tm_scale_bar() +
+  tm_layout(frame = F, legend.outside = T, legend.outside.position = "top", fontfamily = "serif", 
+            legend.title.fontface = "bold", legend.title.size = 1,
+            legend.text.size = 0.6)
 
 # Creating Deciles for ICS 
 ics_hypertension_shp$percentile <- ntile(ics_hypertension_shp$age_std_prev_21_22, 100)
 
-tm_shape(ics_hypertension_shp) + 
-  tm_polygons(col = "age_std_prev_21_22", palette ="-RdBu", title = "Age Std. Prevalence %", 
-              legend.hist = TRUE) +
-  tm_compass(position = c("left", "top")) + 
-  tm_scale_bar() +
-  tm_layout("Age Std. Hypertension Prevalence by ICS", legend.outside = TRUE)
-
-top10_ccg <- ics_hypertension_shp %>%
+top10_ics <- ics_hypertension_shp %>%
   filter(percentile >= 91) %>%
-  select(-c(OBJECTID:SHAPE_Area))
+  select(-c(OBJECTID:SHAPE_Area, ICB22CD:ICB22NM, avg_u79_achievement_21_22:percentile)) %>%
+  st_drop_geometry()
 
-bottom5_ccg <- ics_hypertension_shp %>%
+bottom10_ics <- ics_hypertension_shp %>%
   arrange(age_std_prev_21_22) %>%
-  slice(1:5)
+  head(10) %>%
+  select(-c(OBJECTID:SHAPE_Area, ICB22CD:ICB22NM, avg_u79_achievement_21_22:percentile)) %>%
+  st_drop_geometry()
+
+top10_hypertension_prev <- top10_ics %>%
+  select(SICBL22NM, age_std_prev_21_22, NHSER22NM) %>%
+  arrange(desc(age_std_prev_21_22)) %>%
+  gt() %>%
+  fmt_percent(columns = age_std_prev_21_22, decimals = 2, scale_values = F) %>%
+  gt_theme_538() %>%
+  cols_label(SICBL22NM = "ICS", 
+             age_std_prev_21_22 = "Age Std. Hypertension Prev.", 
+             NHSER22NM = "Region") %>%
+  as_raw_html()
+
+bottom10_hypertension_prev <- bottom10_ics %>%
+  select(SICBL22NM, age_std_prev_21_22, NHSER22NM) %>%
+  arrange(age_std_prev_21_22) %>%
+  gt() %>%
+  fmt_percent(columns = age_std_prev_21_22, decimals = 2, scale_values = F) %>%
+  gt_theme_538() %>%
+  cols_label(SICBL22NM = "ICS", 
+             age_std_prev_21_22 = "Age Std. Hypertension Prev.", 
+             NHSER22NM = "Region") %>%
+  as_raw_html()
+
+hyp_prevalence_tables <- data.frame(top10 = top10_hypertension_prev, 
+                                   bottom10 = bottom10_hypertension_prev)
+
+hyp_prevalence_tables %>%
+  gt() %>%
+  fmt_markdown(columns = everything()) %>%
+  cols_label(top10 = "10 Highest Hypertension Prevalence ICS", 
+             bottom10 = "10 Lowest Hypertension Prevalence ICS") %>%
+  gtsave("Hypertension Prevalence Tables.png", vwidth = 1920, vheight = 1080)
+
+
+
+write_csv(top10_ics, "Top 10 Hypertension Prevalence by ICS.csv")
+write_csv(bottom10_ics, "Bottom 10 Hypertension Prevalence by ICS.csv")
 
 # Plotting the Top Decile of CCGs by Prevalence
-tm_shape(Eng_ICS) + 
+top10_ics_map <- tm_shape(Eng_ICS) + 
   tm_borders(col = "black") +
-  tm_shape(top10_ccg) + 
-  tm_fill(col = "#B2182B") +
+  tm_shape(top10_ics) + 
+  tm_graticules(alpha = 0.2, lines = F) +
+  tm_fill(col = "#f2748c", alpha = 0.8) +
   tm_compass(position = c("left", "top")) + 
   tm_scale_bar() + 
-  tm_layout(main.title = "Top 10th Percentile of Prevalence CCGs")
+  tm_layout(frame = F, compass.type = "4star") 
+top10_ics_map
+jpeg("Top 10 Highest Hypertension Prevalence ICS.jpeg", width= 1400, height= 1200, res = 300)
+print(top10_ics_map)
+dev.off()
 
+top10_ics_table <- top10_ics %>%
+  select(-c(SICBL22CD, SICBL22CDH, NHSER22CD, NHSER22CDH, exp_hyp_21_22, obs_over_exp_22)) %>%
+  st_drop_geometry() %>%
+  arrange(NHSER22NM, desc(age_std_prev_21_22)) %>%
+  gt(groupname_col = "NHSER22NM", rowname_col = "SICBL22NM") %>%
+  tab_style(style = cell_text(align = "left", indent = px(25)), locations = cells_stub()) %>%
+  fmt_percent(columns = c(age_std_prev_21_22, avg_prevalence_21_22), decimals = 2, scale_values = F) %>%
+  tab_header(title = "Top 10 Highest Prevalence ICS") %>%
+  gt_theme_538() %>%
+  cols_label(SICBL22NM = "ICS", 
+             NHSER22NM = "Region", 
+             age_std_prev_21_22 = "Age Standardised Prevalence",
+             avg_prevalence_21_22 = "Observed Prevalence")
+top10_ics_table
 
-# Plotting how many CCGs in each Region are Above National Average
-ggplot(ics_hypertension_shp, aes(x = fct_infreq(NHSER21NM), y = above_average, fill = NHSER21NM)) + 
-  geom_col() +
-  labs(x = "Region", y = "Number of CCGs", 
-       title = "Number of CCGs Above the National Average by Region") +
-  theme_minimal() +
-  theme(legend.position = "none") +
-  scale_fill_brewer(palette = "Dark2") 
-
+top10_ics_table %>% gtsave('Top 10 ICS Hypertension Rates.docx')
 
 # Subsetting CCGs by Region
 # Obtaining the Region Boundaries
@@ -391,7 +525,7 @@ tm_shape(midlands_lsoa_hypertension) +
   tm_shape(midlands_ics_borders) +
   tm_borders()
 
-''' # Superseded # 
+################################### Superseded ################################# 
 tm_shape(midlands_lsoa_hypertension) +
   tm_fill(col = 'obs_over_exp', title = "Obs:Exp Ratio", 
           legend.hist = TRUE, palette = "-RdBu",
@@ -401,7 +535,7 @@ tm_shape(midlands_lsoa_hypertension) +
   tm_layout(main.title = 'Expected vs Observed Hypertension Rates in the Midlands', legend.outside = TRUE) +
   tm_shape(midlands_ics_borders) +
   tm_borders('black', lwd = 1)
-'''
+####------------------------------------------------------------------------####
 
 # North East and Yorkshire
 ggplot(north_east_lsoa_hypertension) + 
@@ -567,9 +701,48 @@ ggplot(ics_hypertension_prev) +
 
 #### Exporting Data for Further Analysis ####
 write_csv(Hyper21_22_cl, "QOF Data 2021_22.csv")
-write_csv(lsoa_age_adj, "Age-Adjusted LSOA Hypertension Data.csv")
+write_csv(ics_grouped, "Age-Adjusted LSOA Hypertension Data.csv")
 write_csv(ics_hypertension_prev, "ICS Hypertension Data.csv")
 write_csv(GP_age_dist_cl, "Cleaned GP Age Distribution.csv")
 write_csv(GP_lsoa_data, "GP LSOA Distribution Data.csv")
 write_csv(lsoa_region, "LSOA to Region Lookup File.csv")
 write_csv(ics_population, "ICS Population.csv")
+write_csv(lsoa_hypertension_prev, "GP to LSOA Hypertension Data.csv")
+write_csv(LSOA_imd_cl, "Cleaned LSOA IMD.csv")
+
+##### GP Coverage Analysis ###########
+gp_coverage_rate <- lsoa_hypertension_prev %>%
+  select(org_code, lsoa_code, lsoa_pop, number_of_patients, practice_name, 
+         gp_coverage, prevalence_percent_21_22, exp_hyp)
+
+gp_cov90 <- gp_coverage_rate %>%
+  filter(gp_coverage >= 0.9)
+
+lsoa_med_age <- read_csv("~/Hypertension/Population Age Distributions/lsoa_median_age.csv", skip = 4) %>%
+  clean_names()
+
+gp_cov90_age_dist <- merge(gp_cov90, lsoa_med_age, by = 'lsoa_code') %>%
+  select_if(~ !any(is.na(.))) %>%
+  select(-c(la_code_2018_boundaries:la_name_2021_boundaries)) %>%
+  get_dupes(practice_name)
+
+diff_5plus <- gp_cov90_age_dist %>%
+  mutate(age_diff = median_age - lead(median_age)) 
+
+diff_filtered <- diff_5plus %>%
+  filter(age_diff <= -5 & practice_name == lead(practice_name) | 
+           age_diff >= 5 & practice_name == lead(practice_name)) 
+
+diff_10plus <- diff_5plus %>%
+  filter(age_diff <= -10 & practice_name == lead(practice_name) | 
+           age_diff >= 10 & practice_name == lead(practice_name)) 
+
+exp_diff5plus <- merge(diff_10plus, lsoa_med_age, by = c('lsoa_code', 'lsoa_name')) %>%
+  select(-c(age0_15:age75plus_perc, starts_with('la'))) %>%
+  mutate(exp_diff = exp_hyp - exp_hyp_no_sex*100) %>%
+  filter(exp_diff <= -5 | exp_diff >= 5)
+
+obs_diff5plus <-  merge(diff_10plus, lsoa_med_age, by = c('lsoa_code', 'lsoa_name')) %>%
+  select(-c(age0_15:age75plus_perc, starts_with('la'))) %>%
+  mutate(obs_diff = prevalence_percent_21_22 - exp_hyp_no_sex*100) %>%
+  filter(obs_diff <= -5 | obs_diff >= 5)

@@ -8,6 +8,8 @@ library(sf)
 library(janitor)
 library(stringr)
 library(ggplot2)
+library(gt) 
+library(gtExtras)
 
 ### Loading in Data ####
 # GP-LSOA Data
@@ -34,6 +36,9 @@ Eng_ICS$SICBL22NM <- gsub("NHS Hampshire and Isle Of Wight ICB - D9Y0V", "NHS Ha
 
 # LSOA to Region Lookup File
 lsoa_region <- read_csv("LSOA to Region Lookup File.csv")
+lsoa_ics <- read_csv("~/Lookup Files/LSOA_(2011)_to_Sub_ICB_Locations_to_Integrated_Care_Boards_(July_2022)_Lookup_in_England.csv") %>%
+  select(-ObjectId)
+
 
 #### Objective 2 ####
 # Comparing QOF Prevalence to HSE Prevalence by GP 
@@ -75,12 +80,21 @@ lsoa_undiagnosed_hypertension <- gp_undiagnosed_hypertension_prev %>%
   mutate(undiagnosed = round(undiagnosed_prev*lsoa_pop/100), 
          hypertension_cases = round(hypertension_prev*lsoa_pop/100))
 
+lsoa_undiagnosed_hypertension_ranked <- merge(lsoa_undiagnosed_hypertension, lsoa_ics, 
+                                              by.x = "lsoa_code", by.y = "LSOA11CD") %>%
+  group_by(SICBL22CD, SICBL22NM, SICBL22CDH) %>%
+  mutate(sub_icb_hypertension_prev_rank = rank(undiagnosed_prev, ties.method = "min")) %>%
+  select(-c(LAD22NM, LAD22CD))
+
+  
 # Aggregating at ICS level
 sub_icb_undiagnosed_hypertension <- gp_undiagnosed_hypertension_prev %>%
   group_by(sub_icb_loc_ods_code, sub_icb_loc_ons_code, sub_icb_loc_name) %>%
   summarise(undiagnosed_hypertension = round(sum(undiagnosed_patients, na.rm = T),digits = 0), 
             population = sum(number_of_patients), 
-            undiagnosed_rate = round(undiagnosed_hypertension/population*100, digits = 2))
+            undiagnosed_rate = round(undiagnosed_hypertension/population*100, digits = 2)) %>%
+  ungroup() %>%
+  mutate(national_rank_undiagnosed_hypertension = rank(undiagnosed_rate, ties.method = "min")) # 1 is Fewest Undiagnosed
 
 top_decile_undiagnosed_ics <-  sub_icb_undiagnosed_hypertension %>%
   mutate(decile = ntile(undiagnosed_hypertension, 10)) %>%
@@ -116,3 +130,4 @@ regional_undiagnosed <- merge(sub_icb_undiagnosed_hypertension, ics_region,
 write_csv(lsoa_undiagnosed_hypertension, "LSOA Undiagnosed Hypertension.csv")
 write_csv(sub_icb_undiagnosed_hypertension, "ICS Undiagnosed Hypertension.csv")
 write_csv(regional_undiagnosed, "Undiagnosed Hypertension by Region.csv")
+write_csv(lsoa_undiagnosed_hypertension_ranked, "Undiagnosed Hypertension by LSOA Ranked.csv")
